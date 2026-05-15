@@ -1,0 +1,65 @@
+# Developer override for docker-compose - merged with docker-compose.yml
+#  This file is committed to repo.
+# It is not used in Railway deployment, but can be used locally to override settings for development.
+# Applicaton service volume mounts are added here as services are scaffolded in docker-compose.yml, so that they are only used in development and not in production.
+
+services:
+
+  postgres:
+    # Faster health checks during local development
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  zookeeper:
+    healthcheck:
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  kafka:
+    healthcheck:
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # ── Application services ──
+  # gateway:
+  #   volumes:
+  #     - ./services/gateway:/app
+  #     - ./services/shared:/app/shared
+  #   environment:
+  #     - PYTHONDONTWRITEBYTECODE=1
+
+  # orchestrator:
+  #   volumes:
+  #     - ./services/orchestrator:/app
+  #     - ./services/shared:/app/shared
+
+  # search-agent:
+  #   volumes:
+  #     - ./services/search_agent:/app
+  #     - ./services/shared:/app/shared
+
+  # code-agent:
+  #   volumes:
+  #     - ./services/code_agent:/app
+  #     - ./services/shared:/app/shared
+
+  # memory-agent:
+  #   volumes:
+  #     - ./services/memory_agent:/app
+  #     - ./services/shared:/app/shared
+
+  # tool-agent:
+  #   volumes:
+  #     - ./services/tool_agent:/app
+  #     - ./services/shared:/app/shared

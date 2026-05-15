@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS — Memory</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family:'Inter',system-ui,sans-serif; box-sizing:border-box; margin:0; padding:0; }
+    body { background:#E8E7E3; }
+
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.55;transform:scale(1.4);} }
+    .pulse-dot { animation:pulse-dot 1.5s ease-in-out infinite; }
+
+    @keyframes shimmer { 0%{background-position:-400px 0;} 100%{background-position:400px 0;} }
+    .shimmer { background:linear-gradient(90deg,#f0efeb 25%,#e4e2dc 50%,#f0efeb 75%); background-size:400px 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:4px; }
+
+    /* ── Layout ── */
+    .shell { display:flex; height:100%; }
+    .sidebar { width:220px; background:#1C1C1A; display:flex; flex-direction:column; flex-shrink:0; }
+    .sidebar-wordmark { padding:18px 16px 14px; display:flex; align-items:center; gap:9px; border-bottom:1px solid rgba(255,255,255,.06); }
+    .sidebar-icon { width:24px; height:24px; background:#534AB7; border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .wordmark-text { font-size:14px; font-weight:600; color:#fff; letter-spacing:.08em; }
+    .sidebar-nav { flex:1; padding:10px 0; display:flex; flex-direction:column; gap:1px; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:9px 16px; font-size:13.5px; font-weight:500; color:#888780; cursor:pointer; border-left:3px solid transparent; text-decoration:none; }
+    .nav-item:hover { background:rgba(255,255,255,.05); color:#fff; }
+    .nav-item.active { border-left-color:#534AB7; color:#534AB7; background:rgba(83,74,183,.08); }
+    .nav-item svg { width:16px; height:16px; flex-shrink:0; }
+    .sidebar-footer { padding:14px 16px; border-top:1px solid rgba(255,255,255,.06); display:flex; align-items:center; gap:9px; }
+    .user-avatar { width:28px; height:28px; background:#534AB7; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:white; flex-shrink:0; }
+    .user-name { font-size:13px; font-weight:500; color:#C8C7C3; flex:1; }
+    .logout-btn { color:#888780; cursor:pointer; display:flex; align-items:center; }
+
+    .main-wrapper { display:flex; flex-direction:column; flex:1; min-width:0; overflow:hidden; }
+    .topbar { height:52px; background:#fff; border-bottom:1px solid rgba(0,0,0,.08); display:flex; align-items:center; padding:0 20px; gap:12px; flex-shrink:0; }
+    .topbar-title { font-size:15px; font-weight:500; color:#1C1C1A; flex:1; }
+    .live-indicator { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#1D9E75; font-weight:500; white-space:nowrap; }
+    .live-dot { width:7px; height:7px; background:#1D9E75; border-radius:50%; flex-shrink:0; }
+    .topbar-divider { width:1px; height:20px; background:rgba(0,0,0,.1); flex-shrink:0; }
+    .topbar-icon-btn { width:32px; height:32px; display:flex; align-items:center; justify-content:center; border-radius:6px; cursor:pointer; color:#888780; flex-shrink:0; }
+    .topbar-avatar { width:28px; height:28px; background:#534AB7; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:white; cursor:pointer; flex-shrink:0; }
+
+    .content-area { flex:1; background:#F5F4F0; overflow-y:auto; padding:24px; }
+
+    /* ── Primitives ── */
+    .card { background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,.07); }
+    .chip { display:inline-flex; align-items:center; gap:4px; padding:2px 7px; border-radius:4px; font-size:11px; font-weight:600; white-space:nowrap; }
+    .chip-search { background:#E6F1FB; color:#0C447C; }
+    .chip-code   { background:#FAEEDA; color:#633806; }
+    .chip-memory { background:#EEEDFE; color:#3C3489; }
+    .chip-tool   { background:#E1F5EE; color:#085041; }
+    .chip-dot { width:5px; height:5px; border-radius:50%; }
+    .chip-search .chip-dot { background:#378ADD; }
+    .chip-code   .chip-dot { background:#EF9F27; }
+    .chip-memory .chip-dot { background:#7F77DD; }
+    .chip-tool   .chip-dot { background:#1D9E75; }
+
+    /* ── Page header ── */
+    .page-desc { font-size:13px; color:#888780; margin-bottom:20px; line-height:1.55; display:flex; align-items:center; gap:8px; }
+    .page-desc code { font-family:'SF Mono','Fira Code',monospace; font-size:12px; background:#F0EFE9; border:1px solid rgba(0,0,0,.08); padding:1px 6px; border-radius:4px; color:#534AB7; }
+
+    /* ── Search bar ── */
+    .search-bar-wrap { background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,.08); padding:16px 18px; margin-bottom:24px; }
+    .search-input-row { display:flex; gap:10px; margin-bottom:10px; }
+    .search-input { flex:1; height:40px; border:1px solid rgba(0,0,0,.12); border-radius:7px; padding:0 14px 0 38px; font-size:14px; color:#1C1C1A; font-family:inherit; outline:none; }
+    .search-input:focus { border-color:#534AB7; box-shadow:0 0 0 3px rgba(83,74,183,.1); }
+    .search-input-wrap { position:relative; flex:1; display:flex; align-items:center; }
+    .search-icon { position:absolute; left:12px; color:#888780; }
+    .btn-primary { background:#534AB7; color:white; border:none; padding:0 18px; height:40px; border-radius:7px; font-size:13.5px; font-weight:500; cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-family:inherit; }
+    .btn-primary:hover { background:#4840A0; }
+    .search-suggestions { font-size:12px; color:#888780; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+    .suggestion-pill { display:inline-flex; align-items:center; padding:2px 9px; border-radius:4px; background:#F0EFE9; color:#534AB7; font-size:12px; font-weight:500; cursor:pointer; border:1px solid rgba(83,74,183,.15); }
+    .suggestion-pill:hover { background:#EEEDFE; }
+
+    /* ── Result cards grid ── */
+    .results-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+
+    /* ── Memory result card ── */
+    .mem-card { background:#fff; border-radius:8px; border:1px solid rgba(0,0,0,.07); padding:16px; position:relative; }
+    .mem-card:hover { border-color:rgba(83,74,183,.25); box-shadow:0 2px 12px rgba(83,74,183,.06); }
+    .sim-badge { position:absolute; top:14px; right:14px; padding:2px 8px; border-radius:4px; font-size:11.5px; font-weight:700; }
+    .sim-high   { background:#D4F3E6; color:#085041; }
+    .sim-med    { background:#FEF3E2; color:#884A05; }
+    .sim-low    { background:#F1EFE8; color:#888780; }
+    .mem-agent-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .mem-query { font-size:12px; color:#888780; font-style:italic; margin-bottom:8px; line-height:1.45; }
+    .mem-content { font-size:13px; color:#1C1C1A; line-height:1.6; margin-bottom:10px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .mem-footer { display:flex; align-items:center; justify-content:space-between; }
+    .mem-timestamp { font-size:11.5px; color:#B0AFA9; }
+    .mem-view-link { font-size:12px; color:#534AB7; font-weight:500; text-decoration:none; }
+    .mem-view-link:hover { text-decoration:underline; }
+
+    /* ── Empty state ── */
+    .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:56px 32px; text-align:center; }
+    .empty-icon-wrap { width:52px; height:52px; background:#F0EFE9; border-radius:12px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+
+    /* ── Results header ── */
+    .results-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .results-count { font-size:13px; font-weight:600; color:#1C1C1A; }
+    .results-meta { font-size:12px; color:#888780; }
+
+    /* ── Demo wrapper ── */
+    .demo-block { padding:32px 32px 0; background:#E8E7E3; }
+    .demo-tag { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:#888780; background:white; border:1px solid rgba(0,0,0,.1); padding:4px 10px; border-radius:4px; margin-bottom:12px; display:inline-block; }
+    .demo-shell-wrap { padding:0 32px; background:#E8E7E3; }
+    .si { width:16px; height:16px; flex-shrink:0; }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     STATE 1 — Populated results
+══════════════════════════════════════════════════════ -->
+<div class="demo-block"><div class="demo-tag">Memory — Populated search results</div></div>
+<div class="demo-shell-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:900px;">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-wordmark"><div class="sidebar-icon"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity="0.6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity="0.3"/></svg></div><span class="wordmark-text">NEXUS</span></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity="0.5"/></svg>Dashboard</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Runs</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx="0.75" fill="currentColor"/><rect x="2" y="10.5" width="8" height="1.5" rx="0.75" fill="currentColor"/></svg>History</a>
+      <a class="nav-item active" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6c0 2.5 2.5 5 5.5 5s5.5-2.5 5.5-5" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Observability</a>
+    </nav>
+    <div class="sidebar-footer"><div class="user-avatar">AK</div><span class="user-name">Aryan K.</span><div class="logout-btn"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><path d="M10 10l4-3-4-3v2H5v2h5v2z" fill="currentColor"/><path d="M8 13H3a1 1 0 01-1-1V3a1 1 0 011-1h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div></div>
+  </div>
+
+  <!-- Main -->
+  <div class="main-wrapper">
+    <div class="topbar">
+      <span class="topbar-title">Memory</span>
+      <div class="live-indicator"><div class="live-dot pulse-dot"></div>3 agents running</div>
+      <div class="topbar-divider"></div>
+      <div class="topbar-icon-btn"><svg viewBox="0 0 16 16" fill="none" width="16" height="16"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+      <div class="topbar-icon-btn"><svg viewBox="0 0 16 16" fill="none" width="16" height="16"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v1.5M8 13.5V15M15 8h-1.5M2.5 8H1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+      <div class="topbar-avatar">AK</div>
+    </div>
+
+    <div class="content-area">
+      <!-- Page description -->
+      <div class="page-desc">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="5" rx="5" ry="3.5" stroke="#888780" stroke-width="1.3"/><path d="M2 5v4c0 1.93 2.24 3.5 5 3.5s5-1.57 5-3.5V5" stroke="#888780" stroke-width="1.3"/></svg>
+        Semantically search all agent memory — embeddings stored via pgvector, <code>384 dimensions</code> (<code>all-MiniLM-L6-v2</code>)
+      </div>
+
+      <!-- Search bar -->
+      <div class="search-bar-wrap">
+        <div class="search-input-row">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.4"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <input class="search-input" value="LLM reasoning" />
+          </div>
+          <button class="btn-primary">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="white" stroke-width="1.4"/><path d="M9 9l3 3" stroke="white" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Search
+          </button>
+        </div>
+        <div class="search-suggestions">
+          <span style="color:#888780;">Try:</span>
+          <span class="suggestion-pill">LLM reasoning</span>
+          <span class="suggestion-pill">Python sorting algorithms</span>
+          <span class="suggestion-pill">weather data</span>
+          <span class="suggestion-pill">Kubernetes networking</span>
+          <span class="suggestion-pill">transformer architecture</span>
+        </div>
+      </div>
+
+      <!-- Results header -->
+      <div class="results-header">
+        <span class="results-count">4 results for "LLM reasoning"</span>
+        <span class="results-meta">searched 847ms · 384-dim cosine similarity</span>
+      </div>
+
+      <!-- Results grid -->
+      <div class="results-grid">
+
+        <!-- Card 1 — high similarity -->
+        <div class="mem-card">
+          <span class="sim-badge sim-high">0.94</span>
+          <div class="mem-agent-row">
+            <span class="chip chip-search"><div class="chip-dot"></div>Search</span>
+            <span style="font-size:11.5px;color:#888780;">run_f51e2b</span>
+          </div>
+          <div class="mem-query">"Papers citing Attention Is All You Need from 2023 onwards"</div>
+          <div class="mem-content">Wei et al. (2022) demonstrated that chain-of-thought prompting — where models emit intermediate reasoning steps — dramatically improves performance on arithmetic, symbolic, and commonsense reasoning benchmarks. Yao et al. (2023) extended this with Tree of Thoughts, enabling exploration of multiple reasoning paths via BFS and DFS. Both papers are foundational references for LLM reasoning research.</div>
+          <div class="mem-footer">
+            <span class="mem-timestamp">Jan 12 · 08:47</span>
+            <a href="#" class="mem-view-link">View full run →</a>
+          </div>
+        </div>
+
+        <!-- Card 2 — high similarity -->
+        <div class="mem-card">
+          <span class="sim-badge sim-high">0.89</span>
+          <div class="mem-agent-row">
+            <span class="chip chip-search"><div class="chip-dot"></div>Search</span>
+            <span style="font-size:11.5px;color:#888780;">run_9d12ef</span>
+          </div>
+          <div class="mem-query">"Summarize top 5 AI research labs by publication count in 2024"</div>
+          <div class="mem-content">DeepMind, OpenAI, Google Brain (now Google DeepMind merged), Meta AI Research, and Anthropic led publication counts in 2024 with a combined focus on language model scaling, alignment, and reasoning capabilities. Google DeepMind produced the highest volume with 342 papers, including several landmark studies on LLM evaluation and emergent reasoning behaviours.</div>
+          <div class="mem-footer">
+            <span class="mem-timestamp">Today · 14:41</span>
+            <a href="#" class="mem-view-link">View full run →</a>
+          </div>
+        </div>
+
+        <!-- Card 3 — medium similarity -->
+        <div class="mem-card">
+          <span class="sim-badge sim-med">0.81</span>
+          <div class="mem-agent-row">
+            <span class="chip chip-code"><div class="chip-dot"></div>Code</span>
+            <span style="font-size:11.5px;color:#888780;">run_a29dc3</span>
+          </div>
+          <div class="mem-query">"Explain RLHF step by step with code examples"</div>
+          <div class="mem-content">RLHF (Reinforcement Learning from Human Feedback) involves three stages: supervised fine-tuning on demonstration data, reward model training on preference pairs, and policy optimisation via PPO. The reward model learns to predict human preferences by comparing response pairs. The policy is then updated to maximise the reward signal while a KL penalty prevents it from diverging too far from the SFT baseline.</div>
+          <div class="mem-footer">
+            <span class="mem-timestamp">Jan 11 · 16:02</span>
+            <a href="#" class="mem-view-link">View full run →</a>
+          </div>
+        </div>
+
+        <!-- Card 4 — low similarity -->
+        <div class="mem-card">
+          <span class="sim-badge sim-low">0.76</span>
+          <div class="mem-agent-row">
+            <span class="chip chip-memory"><div class="chip-dot"></div>Memory</span>
+            <span style="font-size:11.5px;color:#888780;">run_3b91de</span>
+          </div>
+          <div class="mem-query">"Write and debug a Python quicksort implementation with unit tests"</div>
+          <div class="mem-content">Implemented a recursive quicksort in Python using Lomuto partition scheme. Edge cases handled: empty list, single element, already-sorted input, and all-duplicate elements. Test suite covers 6 cases with pytest. The implementation achieves O(n log n) average case with O(n²) worst case on already-sorted input unless random pivot selection is used.</div>
+          <div class="mem-footer">
+            <span class="mem-timestamp">Today · 14:32</span>
+            <a href="#" class="mem-view-link">View full run →</a>
+          </div>
+        </div>
+
+      </div><!-- end results-grid -->
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     STATE 2 — Empty state (no search yet)
+══════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:48px;"><div class="demo-tag">Memory — Empty state (no search yet)</div></div>
+<div class="demo-shell-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);height:600px;">
+  <div class="sidebar">
+    <div class="sidebar-wordmark"><div class="sidebar-icon"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity="0.6"/></svg></div><span class="wordmark-text">NEXUS</span></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/></svg>Dashboard</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/></svg>Runs</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>History</a>
+      <a class="nav-item active" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6c0 2.5 2.5 5 5.5 5s5.5-2.5 5.5-5" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Observability</a>
+    </nav>
+    <div class="sidebar-footer"><div class="user-avatar">AK</div><span class="user-name">Aryan K.</span></div>
+  </div>
+  <div class="main-wrapper">
+    <div class="topbar"><span class="topbar-title">Memory</span></div>
+    <div class="content-area">
+      <div class="page-desc"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><ellipse cx="7" cy="5" rx="5" ry="3.5" stroke="#888780" stroke-width="1.3"/><path d="M2 5v4c0 1.93 2.24 3.5 5 3.5s5-1.57 5-3.5V5" stroke="#888780" stroke-width="1.3"/></svg>Semantically search all agent memory — embeddings stored via pgvector, <code>384 dimensions</code> (<code>all-MiniLM-L6-v2</code>)</div>
+      <div class="search-bar-wrap">
+        <div class="search-input-row">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.4"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <input class="search-input" placeholder="Search agent memory…" />
+          </div>
+          <button class="btn-primary"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="white" stroke-width="1.4"/><path d="M9 9l3 3" stroke="white" stroke-width="1.4" stroke-linecap="round"/></svg>Search</button>
+        </div>
+        <div class="search-suggestions"><span style="color:#888780;">Try:</span><span class="suggestion-pill">LLM reasoning</span><span class="suggestion-pill">Python sorting algorithms</span><span class="suggestion-pill">weather data</span></div>
+      </div>
+
+      <!-- Empty state -->
+      <div style="background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.07);">
+        <div class="empty-state">
+          <div class="empty-icon-wrap">
+            <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+              <ellipse cx="13" cy="9" rx="9" ry="5.5" stroke="#888780" stroke-width="1.5"/>
+              <path d="M4 9v8c0 3.04 4.03 5.5 9 5.5s9-2.46 9-5.5V9" stroke="#888780" stroke-width="1.5"/>
+              <path d="M4 13c0 3.04 4.03 5.5 9 5.5s9-2.46 9-5.5" stroke="#888780" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div style="font-size:15px;font-weight:600;color:#1C1C1A;margin-bottom:6px;">Search agent memory</div>
+          <div style="font-size:13px;color:#888780;line-height:1.55;max-width:280px;">Enter a query above to find semantically similar outputs from past agent runs using cosine similarity over 384-dimensional embeddings.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════
+     STATE 3 — Loading skeleton
+══════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:48px;"><div class="demo-tag">Memory — Loading skeleton (search in progress)</div></div>
+<div class="demo-shell-wrap" style="padding-bottom:48px;">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);height:680px;">
+  <div class="sidebar">
+    <div class="sidebar-wordmark"><div class="sidebar-icon"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/></svg></div><span class="wordmark-text">NEXUS</span></div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/></svg>Dashboard</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/></svg>Runs</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx="0.75" fill="currentColor"/></svg>History</a>
+      <a class="nav-item active" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="nav-item" href="#"><svg class="si" viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Observability</a>
+    </nav>
+    <div class="sidebar-footer"><div class="user-avatar">AK</div><span class="user-name">Aryan K.</span></div>
+  </div>
+  <div class="main-wrapper">
+    <div class="topbar"><span class="topbar-title">Memory</span></div>
+    <div class="content-area">
+      <div class="search-bar-wrap" style="margin-bottom:20px;">
+        <div class="search-input-row">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.4"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <input class="search-input" value="LLM reasoning" />
+          </div>
+          <button class="btn-primary" style="opacity:0.7;cursor:wait;">Searching…</button>
+        </div>
+      </div>
+      <div class="results-grid">
+        <div class="mem-card" style="pointer-events:none;">
+          <div class="shimmer" style="height:20px;width:40px;position:absolute;top:14px;right:14px;border-radius:4px;"></div>
+          <div style="display:flex;gap:6px;margin-bottom:10px;"><div class="shimmer" style="height:20px;width:60px;border-radius:4px;"></div></div>
+          <div class="shimmer" style="height:12px;width:80%;margin-bottom:8px;"></div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"><div class="shimmer" style="height:13px;"></div><div class="shimmer" style="height:13px;"></div><div class="shimmer" style="height:13px;width:80%;"></div></div>
+          <div style="display:flex;justify-content:space-between;"><div class="shimmer" style="height:11px;width:80px;"></div><div class="shimmer" style="height:11px;width:80px;"></div></div>
+        </div>
+        <div class="mem-card" style="pointer-events:none;">
+          <div class="shimmer" style="height:20px;width:40px;position:absolute;top:14px;right:14px;border-radius:4px;"></div>
+          <div style="display:flex;gap:6px;margin-bottom:10px;"><div class="shimmer" style="height:20px;width:56px;border-radius:4px;"></div></div>
+          <div class="shimmer" style="height:12px;width:75%;margin-bottom:8px;"></div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"><div class="shimmer" style="height:13px;"></div><div class="shimmer" style="height:13px;width:90%;"></div><div class="shimmer" style="height:13px;width:70%;"></div></div>
+          <div style="display:flex;justify-content:space-between;"><div class="shimmer" style="height:11px;width:80px;"></div><div class="shimmer" style="height:11px;width:80px;"></div></div>
+        </div>
+        <div class="mem-card" style="pointer-events:none;">
+          <div class="shimmer" style="height:20px;width:40px;position:absolute;top:14px;right:14px;border-radius:4px;"></div>
+          <div style="display:flex;gap:6px;margin-bottom:10px;"><div class="shimmer" style="height:20px;width:52px;border-radius:4px;"></div></div>
+          <div class="shimmer" style="height:12px;width:85%;margin-bottom:8px;"></div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"><div class="shimmer" style="height:13px;width:95%;"></div><div class="shimmer" style="height:13px;"></div><div class="shimmer" style="height:13px;width:75%;"></div></div>
+          <div style="display:flex;justify-content:space-between;"><div class="shimmer" style="height:11px;width:80px;"></div><div class="shimmer" style="height:11px;width:80px;"></div></div>
+        </div>
+        <div class="mem-card" style="pointer-events:none;">
+          <div class="shimmer" style="height:20px;width:40px;position:absolute;top:14px;right:14px;border-radius:4px;"></div>
+          <div style="display:flex;gap:6px;margin-bottom:10px;"><div class="shimmer" style="height:20px;width:68px;border-radius:4px;"></div></div>
+          <div class="shimmer" style="height:12px;width:70%;margin-bottom:8px;"></div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"><div class="shimmer" style="height:13px;"></div><div class="shimmer" style="height:13px;width:85%;"></div><div class="shimmer" style="height:13px;width:60%;"></div></div>
+          <div style="display:flex;justify-content:space-between;"><div class="shimmer" style="height:11px;width:80px;"></div><div class="shimmer" style="height:11px;width:80px;"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>

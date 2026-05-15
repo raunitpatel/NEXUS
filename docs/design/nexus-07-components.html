@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS — UI Component Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F5F4F0; padding: 48px; }
+
+    /* ── Pulse animation ── */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(29,158,117,0.4); }
+      50%       { opacity: 0.7; transform: scale(1.25); box-shadow: 0 0 0 4px rgba(29,158,117,0); }
+    }
+    .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+    /* ── Shimmer animation ── */
+    @keyframes shimmer {
+      0%   { background-position: -400px 0; }
+      100% { background-position:  400px 0; }
+    }
+    .shimmer {
+      background: linear-gradient(90deg, #f0efeb 25%, #e4e2dc 50%, #f0efeb 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+      border-radius: 4px;
+    }
+
+    /* ── Spinner animation ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    /* ── Progress pulse (for RunCard) ── */
+    @keyframes prog-pulse { 0%,100%{opacity:1;} 50%{opacity:0.65;} }
+
+    /* ── Section scaffold ── */
+    .section { margin-bottom: 56px; }
+    .section-title {
+      font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+      color: #888780; margin-bottom: 20px; padding-bottom: 10px;
+      border-bottom: 1px solid rgba(0,0,0,0.08);
+    }
+    .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    .col { display: flex; flex-direction: column; gap: 10px; }
+    .row-label { font-size: 11px; color: #B0AFA9; font-weight: 500; min-width: 80px; }
+
+    /* ── StatusBadge ── */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; white-space: nowrap;
+    }
+    .badge-running   { background: #E8F8F2; color: #1D9E75; }
+    .badge-completed { background: #E8F8F2; color: #1D9E75; }
+    .badge-failed    { background: #FDECEA; color: #E24B4A; }
+    .badge-queued    { background: #FEF3E2; color: #BA7517; }
+    .badge-cancelled { background: #F1EFE8; color: #888780; }
+    .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+    /* ── AgentChip ── */
+    .chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 5px; font-size: 12px; font-weight: 600; white-space: nowrap;
+    }
+    .chip-search { background: #E6F1FB; color: #0C447C; }
+    .chip-code   { background: #FAEEDA; color: #633806; }
+    .chip-memory { background: #EEEDFE; color: #3C3489; }
+    .chip-tool   { background: #E1F5EE; color: #085041; }
+    .chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .chip-search .chip-dot { background: #378ADD; }
+    .chip-code   .chip-dot { background: #EF9F27; }
+    .chip-memory .chip-dot { background: #7F77DD; }
+    .chip-tool   .chip-dot { background: #1D9E75; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 8px 16px; border-radius: 6px; font-size: 13.5px; font-weight: 500;
+      cursor: pointer; font-family: inherit; border: none; white-space: nowrap;
+      transition: background 0.12s, opacity 0.12s;
+    }
+    .btn-primary   { background: #534AB7; color: white; }
+    .btn-primary:hover { background: #4840A0; }
+    .btn-secondary { background: transparent; color: #534AB7; border: 1.5px solid #534AB7; }
+    .btn-secondary:hover { background: rgba(83,74,183,0.05); }
+    .btn-danger    { background: transparent; color: #E24B4A; border: 1.5px solid #E24B4A; }
+    .btn-danger:hover { background: rgba(226,75,74,0.05); }
+    .btn-disabled  { background: #F1EFE8; color: #B0AFA9; border: 1.5px solid rgba(0,0,0,0.08); cursor: not-allowed; }
+    .btn-loading   { background: #534AB7; color: white; opacity: 0.85; cursor: wait; }
+
+    /* ── Input ── */
+    .input-wrap { display: flex; flex-direction: column; gap: 4px; }
+    .input-label { font-size: 11.5px; font-weight: 600; color: #888780; text-transform: uppercase; letter-spacing: .05em; }
+    .inp {
+      height: 36px; border: 1px solid rgba(0,0,0,0.12); border-radius: 6px;
+      padding: 0 12px; font-size: 13.5px; font-family: inherit; color: #1C1C1A;
+      outline: none; width: 260px; background: white;
+    }
+    .inp::placeholder { color: #B0AFA9; }
+    .inp-focused { border-color: #534AB7; box-shadow: 0 0 0 3px rgba(83,74,183,0.12); }
+    .inp-error   { border-color: #E24B4A; box-shadow: 0 0 0 3px rgba(226,75,74,0.1); }
+    .inp-disabled { background: #F5F4F0; color: #B0AFA9; cursor: not-allowed; }
+    .error-msg { font-size: 12px; color: #E24B4A; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+
+    /* ── Skeleton cards ── */
+    .skeleton-card {
+      background: white; border-radius: 8px; border: 1px solid rgba(0,0,0,0.07);
+      padding: 16px 18px; width: 320px;
+    }
+    .skeleton-row-wrap {
+      background: white; border-radius: 8px; border: 1px solid rgba(0,0,0,0.07);
+      padding: 14px 16px; width: 560px;
+    }
+    .skeleton-event-wrap {
+      background: white; border-radius: 8px; border: 1px solid rgba(0,0,0,0.07);
+      padding: 0; width: 460px; overflow: hidden;
+    }
+    .skeleton-event-row {
+      border-left: 3px solid #F0EFE9; padding: 12px 16px;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .skeleton-event-row:last-child { border-bottom: none; }
+
+    /* ── EmptyState ── */
+    .empty-card {
+      background: white; border-radius: 8px; border: 1px solid rgba(0,0,0,0.07);
+      padding: 40px 24px; width: 300px; display: flex; flex-direction: column;
+      align-items: center; text-align: center;
+    }
+    .empty-icon-wrap {
+      width: 48px; height: 48px; background: #F0EFE9; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center; margin-bottom: 14px;
+    }
+    .empty-heading { font-size: 14px; font-weight: 600; color: #1C1C1A; margin-bottom: 6px; }
+    .empty-sub { font-size: 12.5px; color: #888780; line-height: 1.55; }
+
+    /* ── RunCard ── */
+    .run-card {
+      background: white; border-radius: 8px; border: 1px solid rgba(0,0,0,0.07);
+      padding: 16px 18px; width: 560px;
+    }
+    .run-card:hover { border-color: rgba(83,74,183,0.22); box-shadow: 0 2px 10px rgba(83,74,183,0.07); }
+    .run-id { font-family: 'SF Mono','Fira Code',monospace; font-size: 12px; color: #534AB7; }
+    .run-query { font-size: 13px; color: #2C2C2A; margin: 4px 0 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 440px; }
+    .prog-track { height: 3px; background: #F0EFE9; border-radius: 2px; width: 120px; overflow: hidden; }
+    .prog-fill  { height: 100%; background: #534AB7; border-radius: 2px; animation: prog-pulse 2s ease-in-out infinite; }
+    .btn-outlined {
+      background: transparent; color: #534AB7; border: 1px solid rgba(83,74,183,0.35);
+      padding: 5px 11px; border-radius: 5px; font-size: 12px; font-weight: 500;
+      cursor: pointer; font-family: inherit; white-space: nowrap;
+    }
+    .btn-outlined:hover { background: rgba(83,74,183,0.05); }
+
+    /* ── Page heading ── */
+    .page-heading {
+      font-size: 22px; font-weight: 600; color: #1C1C1A; margin-bottom: 6px;
+    }
+    .page-sub {
+      font-size: 13.5px; color: #888780; margin-bottom: 48px; line-height: 1.5;
+    }
+    .divider { height: 1px; background: rgba(0,0,0,0.07); margin: 0 0 56px; }
+  </style>
+</head>
+<body>
+
+  <div style="max-width: 900px; margin: 0 auto;">
+
+    <div class="page-heading">NEXUS — UI Component Library</div>
+    <div class="page-sub">All reusable primitives with every variant and state. Reference this file to verify visual consistency before writing component code.</div>
+
+
+    <!-- ════════════════════════════════════════════
+         1. STATUS BADGE
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">StatusBadge</div>
+      <div class="row">
+        <!-- Running — animated dot -->
+        <span class="badge badge-running">
+          <span class="badge-dot pulse-dot"></span>
+          Running
+        </span>
+        <!-- Completed — checkmark -->
+        <span class="badge badge-completed">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M2 5.5l2.5 2.5L9 3" stroke="#1D9E75" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Completed
+        </span>
+        <!-- Failed — X -->
+        <span class="badge badge-failed">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <path d="M3 3l5 5M8 3l-5 5" stroke="#E24B4A" stroke-width="1.6" stroke-linecap="round"/>
+          </svg>
+          Failed
+        </span>
+        <!-- Queued — clock -->
+        <span class="badge badge-queued">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <circle cx="5.5" cy="5.5" r="4" stroke="#BA7517" stroke-width="1.3"/>
+            <path d="M5.5 3.5v2l1.5 1" stroke="#BA7517" stroke-width="1.3" stroke-linecap="round"/>
+          </svg>
+          Queued
+        </span>
+        <!-- Cancelled — dash -->
+        <span class="badge badge-cancelled">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <circle cx="5.5" cy="5.5" r="4" stroke="#888780" stroke-width="1.3"/>
+            <path d="M3.5 5.5h4" stroke="#888780" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          Cancelled
+        </span>
+      </div>
+      <div style="font-size:12px;color:#B0AFA9;margin-top:8px;">Running uses <code style="font-family:monospace;font-size:11px;background:#F0EFE9;padding:1px 5px;border-radius:3px;">pulse-dot</code> keyframe animation (1.5s ease-in-out infinite). All others are static.</div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         2. AGENT CHIP
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">AgentChip</div>
+      <div class="row">
+        <span class="chip chip-search"><div class="chip-dot"></div>Search</span>
+        <span class="chip chip-code"><div class="chip-dot"></div>Code</span>
+        <span class="chip chip-memory"><div class="chip-dot"></div>Memory</span>
+        <span class="chip chip-tool"><div class="chip-dot"></div>Tool</span>
+      </div>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:12px;color:#B0AFA9;"><strong style="color:#888780;">Search</strong> — bg #E6F1FB · text #0C447C · dot #378ADD</div>
+        <div style="font-size:12px;color:#B0AFA9;"><strong style="color:#888780;">Code</strong> — bg #FAEEDA · text #633806 · dot #EF9F27</div>
+        <div style="font-size:12px;color:#B0AFA9;"><strong style="color:#888780;">Memory</strong> — bg #EEEDFE · text #3C3489 · dot #7F77DD</div>
+        <div style="font-size:12px;color:#B0AFA9;"><strong style="color:#888780;">Tool</strong> — bg #E1F5EE · text #085041 · dot #1D9E75</div>
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         3. BUTTON
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">Button</div>
+      <div class="row" style="align-items:flex-start; gap:16px;">
+
+        <!-- Primary -->
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <div class="row-label">Primary</div>
+          <button class="btn btn-primary">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
+            New Run
+          </button>
+        </div>
+
+        <!-- Secondary -->
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <div class="row-label">Secondary</div>
+          <button class="btn btn-secondary">View details</button>
+        </div>
+
+        <!-- Danger -->
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <div class="row-label">Danger</div>
+          <button class="btn btn-danger">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3l6 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+            Cancel run
+          </button>
+        </div>
+
+        <!-- Disabled -->
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <div class="row-label">Disabled</div>
+          <button class="btn btn-disabled" disabled>Start run</button>
+        </div>
+
+        <!-- Loading -->
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <div class="row-label">Loading</div>
+          <button class="btn btn-loading" disabled>
+            <div class="spinner"></div>
+            Loading…
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         4. INPUT
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">Input</div>
+      <div class="row" style="align-items:flex-start; gap:24px; flex-wrap:wrap;">
+
+        <!-- Default -->
+        <div class="input-wrap">
+          <span class="input-label">Default</span>
+          <input class="inp" placeholder="Enter your query…" />
+        </div>
+
+        <!-- Focused (simulated with class) -->
+        <div class="input-wrap">
+          <span class="input-label">Focused</span>
+          <input class="inp inp-focused" value="LLM reasoning papers 2024" />
+        </div>
+
+        <!-- Error -->
+        <div class="input-wrap">
+          <span class="input-label">Error</span>
+          <input class="inp inp-error" value="" placeholder="Enter your query…" />
+          <span class="error-msg">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="#E24B4A" stroke-width="1.3"/><path d="M6 4v2.5" stroke="#E24B4A" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="8.5" r="0.7" fill="#E24B4A"/></svg>
+            This field is required
+          </span>
+        </div>
+
+        <!-- Disabled -->
+        <div class="input-wrap">
+          <span class="input-label">Disabled</span>
+          <input class="inp inp-disabled" value="Unavailable" disabled />
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         5. LOADING SKELETON
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">LoadingSkeleton — 3 variants</div>
+      <div class="row" style="align-items:flex-start; gap:20px; flex-wrap:wrap;">
+
+        <!-- Variant A: Metric card skeleton -->
+        <div>
+          <div style="font-size:11.5px;color:#888780;font-weight:500;margin-bottom:8px;">Metric card</div>
+          <div class="skeleton-card">
+            <div class="shimmer" style="height:11px; width:80px; margin-bottom:14px;"></div>
+            <div class="shimmer" style="height:28px; width:54px; margin-bottom:10px;"></div>
+            <div class="shimmer" style="height:11px; width:110px;"></div>
+          </div>
+        </div>
+
+        <!-- Variant B: Run row skeleton -->
+        <div>
+          <div style="font-size:11.5px;color:#888780;font-weight:500;margin-bottom:8px;">Run row</div>
+          <div class="skeleton-row-wrap">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+              <div class="shimmer" style="height:12px; width:78px;"></div>
+              <div class="shimmer" style="height:22px; width:65px; border-radius:4px;"></div>
+            </div>
+            <div class="shimmer" style="height:13px; width:380px; margin-bottom:10px;"></div>
+            <div style="display:flex; gap:6px;">
+              <div class="shimmer" style="height:20px; width:58px; border-radius:4px;"></div>
+              <div class="shimmer" style="height:20px; width:58px; border-radius:4px;"></div>
+              <div class="shimmer" style="height:20px; width:80px; margin-left:auto; border-radius:4px;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Variant C: Thought event skeleton (full width) -->
+      <div style="margin-top:20px;">
+        <div style="font-size:11.5px;color:#888780;font-weight:500;margin-bottom:8px;">Thought event</div>
+        <div class="skeleton-event-wrap">
+          <div class="skeleton-event-row" style="border-left-color:#EEEDFE;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:9px;">
+              <div class="shimmer" style="height:18px; width:52px; border-radius:3px;"></div>
+              <div class="shimmer" style="height:11px; width:60px;"></div>
+            </div>
+            <div class="shimmer" style="height:13px; margin-bottom:6px;"></div>
+            <div class="shimmer" style="height:13px; width:88%;"></div>
+          </div>
+          <div class="skeleton-event-row" style="border-left-color:#FEF3E2;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:9px;">
+              <div class="shimmer" style="height:18px; width:62px; border-radius:3px;"></div>
+              <div class="shimmer" style="height:11px; width:60px;"></div>
+            </div>
+            <div class="shimmer" style="height:12px; width:120px; margin-bottom:7px;"></div>
+            <div class="shimmer" style="height:40px; border-radius:5px;"></div>
+          </div>
+          <div class="skeleton-event-row" style="border-left-color:#E1F5EE;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:9px;">
+              <div class="shimmer" style="height:18px; width:74px; border-radius:3px;"></div>
+              <div class="shimmer" style="height:11px; width:60px;"></div>
+            </div>
+            <div class="shimmer" style="height:13px; margin-bottom:6px;"></div>
+            <div class="shimmer" style="height:13px; width:65%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         6. EMPTY STATE
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">EmptyState — 3 variants</div>
+      <div class="row" style="align-items:flex-start; gap:16px; flex-wrap:wrap;">
+
+        <!-- No runs -->
+        <div class="empty-card">
+          <div class="empty-icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="#888780" stroke-width="1.5"/>
+              <polygon points="10,8 17,12 10,16" fill="#888780"/>
+            </svg>
+          </div>
+          <div class="empty-heading">No runs yet</div>
+          <div class="empty-sub">Start your first agent run using the New Run button above.</div>
+          <button class="btn btn-primary" style="margin-top:18px; font-size:12.5px; padding:7px 14px;">
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M5.5 1v9M1 5.5h9" stroke="white" stroke-width="1.7" stroke-linecap="round"/></svg>
+            New Run
+          </button>
+        </div>
+
+        <!-- No memory -->
+        <div class="empty-card">
+          <div class="empty-icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <ellipse cx="12" cy="8" rx="8" ry="4.5" stroke="#888780" stroke-width="1.5"/>
+              <path d="M4 8v8c0 2.49 3.58 4.5 8 4.5s8-2.01 8-4.5V8" stroke="#888780" stroke-width="1.5"/>
+              <path d="M4 12c0 2.49 3.58 4.5 8 4.5s8-2.01 8-4.5" stroke="#888780" stroke-width="1.5"/>
+            </svg>
+          </div>
+          <div class="empty-heading">No memory found</div>
+          <div class="empty-sub">Agent memory appears here after runs complete and embeddings are stored.</div>
+        </div>
+
+        <!-- No agents -->
+        <div class="empty-card">
+          <div class="empty-icon-wrap">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <rect x="7" y="11" width="10" height="9" rx="2" stroke="#888780" stroke-width="1.5"/>
+              <path d="M9 11V8a3 3 0 016 0v3" stroke="#888780" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="10" cy="15" r="1" fill="#888780"/>
+              <circle cx="14" cy="15" r="1" fill="#888780"/>
+              <path d="M12 17v1" stroke="#888780" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="empty-heading">No agents configured</div>
+          <div class="empty-sub">Check your backend services are running. All 5 services must be healthy.</div>
+          <div style="margin-top:14px; padding:8px 12px; background:#FDECEA; border-radius:6px; font-size:12px; color:#E24B4A; font-weight:500; display:flex; align-items:center; gap:6px;">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.3"/><path d="M6 4v2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="6" cy="8.5" r="0.7" fill="currentColor"/></svg>
+            Services unreachable
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         7. RUN CARD (active run)
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">RunCard — active run (as in Active Runs panel)</div>
+      <div class="run-card">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:4px;">
+          <div style="min-width:0;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:3px;">
+              <span class="run-id">run_8f3a2c</span>
+              <span style="font-size:11.5px; color:#888780;">started 22s ago</span>
+            </div>
+            <div class="run-query">Research recent papers on LLM reasoning and chain-of-thought prompting techniques</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span class="badge badge-running">
+              <span class="badge-dot pulse-dot"></span>
+              Running
+            </span>
+            <button class="btn-outlined">View</button>
+          </div>
+        </div>
+        <!-- Agent chips + elapsed + progress bar row -->
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span class="chip chip-search"><div class="chip-dot"></div>Search</span>
+            <span class="chip chip-memory"><div class="chip-dot"></div>Memory</span>
+            <span style="font-size:11.5px; color:#888780; margin-left:4px;">running for 22s</span>
+          </div>
+          <div class="prog-track">
+            <div class="prog-fill" style="width: 68%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Second example: code+tool run -->
+      <div class="run-card" style="margin-top:12px;">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:4px;">
+          <div style="min-width:0;">
+            <div style="display:flex; align-items:center; gap:10px; margin-bottom:3px;">
+              <span class="run-id">run_3b91de</span>
+              <span style="font-size:11.5px; color:#888780;">started 31s ago</span>
+            </div>
+            <div class="run-query">Write and debug a Python quicksort implementation with comprehensive unit tests</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+            <span class="badge badge-running">
+              <span class="badge-dot pulse-dot"></span>
+              Running
+            </span>
+            <button class="btn-outlined">View</button>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-top:4px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span class="chip chip-code"><div class="chip-dot"></div>Code</span>
+            <span class="chip chip-tool"><div class="chip-dot"></div>Tool</span>
+            <span style="font-size:11.5px; color:#888780; margin-left:4px;">running for 31s</span>
+          </div>
+          <div class="prog-track">
+            <div class="prog-fill" style="width: 42%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         8. COLOUR REFERENCE SWATCH
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">Colour reference</div>
+      <div style="display:flex; flex-wrap:wrap; gap:12px;">
+
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#534AB7;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#534AB7<br>Accent</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#1D9E75;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#1D9E75<br>Success</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#BA7517;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#BA7517<br>Warning</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#E24B4A;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#E24B4A<br>Error</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#1C1C1A;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#1C1C1A<br>Sidebar</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#2C2C2A;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#2C2C2A<br>Text dark</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#888780;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#888780<br>Muted</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#F5F4F0;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#F5F4F0<br>BG main</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#FFFFFF;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#FFFFFF<br>Card</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#378ADD;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#378ADD<br>Search dot</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#EF9F27;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#EF9F27<br>Code dot</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;align-items:center;">
+          <div style="width:48px;height:48px;border-radius:8px;background:#7F77DD;border:1px solid rgba(0,0,0,.08);"></div>
+          <div style="font-size:10.5px;color:#888780;text-align:center;">#7F77DD<br>Memory dot</div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════════════
+         9. TYPOGRAPHY SCALE
+    ════════════════════════════════════════════ -->
+    <div class="section">
+      <div class="section-title">Typography scale</div>
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">28px / 500 — card metric</span>
+          <span style="font-size:28px;font-weight:500;color:#1C1C1A;">142</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">16px / 500 — run query</span>
+          <span style="font-size:16px;font-weight:500;color:#1C1C1A;">Research recent papers on LLM reasoning</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">15px / 500 — topbar title</span>
+          <span style="font-size:15px;font-weight:500;color:#1C1C1A;">Dashboard</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">13.5px / 400 — body text</span>
+          <span style="font-size:13.5px;color:#2C2C2A;">Agent thought traces appear in this size with italic styling for thought events.</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">13px / 400 — table / card</span>
+          <span style="font-size:13px;color:#1C1C1A;">run_8f3a2c · Today 14:32 · Completed</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">12px mono — run ID</span>
+          <span style="font-size:12px;font-family:'SF Mono','Fira Code',monospace;color:#534AB7;">run_8f3a2c</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">11.5px / 600 — table header</span>
+          <span style="font-size:11.5px;font-weight:600;color:#888780;text-transform:uppercase;letter-spacing:.05em;">Run ID</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:24px;">
+          <span style="font-size:11px;color:#B0AFA9;font-weight:500;width:120px;">11px / 700 — section label</span>
+          <span style="font-size:11px;font-weight:700;color:#888780;text-transform:uppercase;letter-spacing:.08em;">Token usage</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end max-width wrapper -->
+</body>
+</html>
