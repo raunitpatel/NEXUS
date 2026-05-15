@@ -48,7 +48,8 @@ class TestPostgresReachability:
 
         conn = psycopg2.connect(
             host="localhost",
-            port=os.getenv("POSTGRES_PORT", 5432),
+            port=os.getenv("POSTGRES_PORT", 5432
+            ),
             user=os.getenv("POSTGRES_USER", "nexus"),
             password=os.getenv("POSTGRES_PASSWORD"),
             dbname=os.getenv("POSTGRES_DB", "nexus_db"),
