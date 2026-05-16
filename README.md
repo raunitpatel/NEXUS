@@ -113,6 +113,8 @@ python --version   # must show Python 3.11.9
 
 ## 5. Environment variables
 
+### Root `.env` (infrastructure + all services)
+
 **Windows**
 ```powershell
 Copy-Item .env.example .env
@@ -125,16 +127,36 @@ cp .env.example .env
 nano .env
 ```
 
+### `db/.env` (seed script — runs on Windows host, outside Docker)
+
+**Windows**
+```powershell
+Copy-Item db\.env.example db\.env
+code db\.env
+```
+
+**Linux**
+```bash
+cp db/.env.example db/.env
+nano db/.env
+```
+
 ### Values to set
 
-| Variable | Notes |
-|---|---|
-| `POSTGRES_PASSWORD` | Set something strong |
-| `REDIS_PASSWORD` | Set something strong |
-| `ANTHROPIC_API_KEY` | From https://console.anthropic.com |
-| `JWT_SECRET` | Any random string, 32+ chars |
-| `POSTGRES_PORT` | Change to `5434` if port 5432 is taken |
-| `NGINX_HOST_PORT` | Change to `8080` if port 80 is taken |
+| Variable | File | Notes |
+|---|---|---|
+| `POSTGRES_PASSWORD` | `.env` | Set something strong |
+| `REDIS_PASSWORD` | `.env` | Set something strong |
+| `ANTHROPIC_API_KEY` | `.env` | From https://console.anthropic.com |
+| `JWT_SECRET` | `.env` | Any random string, 32+ chars |
+| `POSTGRES_PORT` | `.env` | Change to `5434` if port 5432 is taken |
+| `NGINX_HOST_PORT` | `.env` | Change to `8080` if port 80 is taken |
+| `DATABASE_URL_LOCAL` | `db/.env` | Must use host-mapped port (default `5434`) |
+
+> `db/.env` is git-ignored — never commit it. It holds the host-side
+> connection string used by `db/seed.py` and other CLI tools that run
+> outside Docker. Services running inside Docker use `DATABASE_URL` from
+> the root `.env`.
 
 ---
 
@@ -164,7 +186,7 @@ Linux — skip this section.
 .\scripts\start-infra.ps1
 ```
 
-**Linux** (shell scripts are not present in the directory you may need to write them)
+**Linux**
 ```bash
 chmod +x scripts/start-infra.sh
 ./scripts/start-infra.sh
@@ -172,7 +194,41 @@ chmod +x scripts/start-infra.sh
 
 ---
 
-## 8. Verify
+## 8. Seed the database
+
+Run once after infrastructure is up. Safe to re-run — fully idempotent.
+
+**Windows**
+```powershell
+.\scripts\seed-db.ps1
+```
+
+**Linux**
+```bash
+python -m pip install -r db/requirements.txt
+DATABASE_URL_LOCAL=postgresql+asyncpg://nexus:nexus_1234@localhost:5434/nexus_db \
+  python db/seed.py
+```
+
+### Verify seed data
+
+```powershell
+# Users — expect 10
+docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT COUNT(*) FROM users;"
+
+# Agents — expect 4 rows, one per type
+docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT type, COUNT(*) FROM agents GROUP BY type ORDER BY type;"
+
+# Runs — expect completed=30, failed=10, pending=10
+docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT status, COUNT(*) FROM runs GROUP BY status ORDER BY status;"
+
+# Tasks — expect 200
+docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT COUNT(*) FROM tasks;"
+```
+
+---
+
+## 9. Verify infrastructure
 
 ```bash
 # All 4 stateful containers must show healthy
@@ -193,7 +249,7 @@ python -m pytest tests/integration/test_infra.py -v
 
 ---
 
-## 9. Daily workflow
+## 10. Daily workflow
 
 ```bash
 # cd into nexus — pyenv switches to 3.11.9 automatically
