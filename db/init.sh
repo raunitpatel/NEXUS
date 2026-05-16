@@ -1,21 +1,21 @@
+# Create the file with explicit LF line endings
 #!/bin/bash
-# nexus/db/init.sh
-# PostgreSQL initialization script.
-# Mounted at: /docker-entrypoint-initdb.d/init.sh
-# Runs once on first container boot (when postgres_data volume is empty).
-#
-# WINDOWS NOTE: This file MUST have LF line endings (enforced by .gitattributes).
+# db/init.sh
+# Bootstraps the NEXUS database: installs pgvector extension, then applies schema.sql.
+# Executed automatically by PostgreSQL on first container start via docker-entrypoint-initdb.d.
+# Idempotent: safe to run multiple times due to IF NOT EXISTS guards throughout schema.sql.
 
 set -e
 
-echo "Enabling pgvector extension..."
-psql -v ON_ERROR_STOP=1 \
-    --username "$POSTGRES_USER" \
-    --dbname "$POSTGRES_DB" \
-    <<-EOSQL
+echo "[NEXUS init.sh] Installing pgvector extension..."
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
     CREATE EXTENSION IF NOT EXISTS vector;
-    CREATE EXTENSION IF NOT EXISTS pg_trgm;
-    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 EOSQL
 
-echo "Extensions enabled: pgvector, pg_trgm, uuid-ossp"
+echo "[NEXUS init.sh] Applying schema.sql..."
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" \
+    -f /docker-entrypoint-initdb.d/schema.sql
+
+echo "[NEXUS init.sh] Database bootstrap complete."
+
+

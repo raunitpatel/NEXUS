@@ -11,14 +11,11 @@ Run:
 """
 from __future__ import annotations
 
-import asyncio
 import socket
-from typing import Generator
 from dotenv import load_dotenv  
 import os
 
 import pytest
-import pytest_asyncio
 
 load_dotenv(dotenv_path=".env")
 
