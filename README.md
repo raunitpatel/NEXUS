@@ -179,7 +179,38 @@ Linux — skip this section.
 
 ---
 
-## 7. Start infrastructure
+## 7. Check prerequisites
+
+Verifies:
+- Docker daemon is running
+- Docker Compose is available
+- Required ports are free
+- `.env` files exist
+- Python 3.11.9 is active
+
+**Windows**
+```powershell
+.\scripts\check-prerequisites.ps1
+```
+
+**Linux**
+```bash
+chmod +x scripts/check-prerequisites.sh
+./scripts/check-prerequisites.sh
+```
+
+---
+
+## 8. Start infrastructure
+
+Starts:
+- PostgreSQL
+- Redis
+- Kafka
+- Zookeeper
+- Jaeger
+- Prometheus
+- Nginx
 
 **Windows**
 ```powershell
@@ -194,9 +225,11 @@ chmod +x scripts/start-infra.sh
 
 ---
 
-## 8. Seed the database
+## 9. Seed the database (first time only)
 
-Run once after infrastructure is up. Safe to re-run — fully idempotent.
+Run once after infrastructure is up.
+
+Safe to re-run — fully idempotent.
 
 **Windows**
 ```powershell
@@ -205,66 +238,73 @@ Run once after infrastructure is up. Safe to re-run — fully idempotent.
 
 **Linux**
 ```bash
-python -m pip install -r db/requirements.txt
-DATABASE_URL_LOCAL=postgresql+asyncpg://nexus:nexus_1234@localhost:5434/nexus_db \
-  python db/seed.py
+chmod +x scripts/seed-db.ps1
+./scripts/seed-db.ps1
 ```
 
-### Verify seed data
+---
+
+## 10. Start application services
+
+Builds and starts:
+- API Gateway
+- Future agent services
+
+**Windows**
+```powershell
+.\scripts\run-all-services.ps1
+```
+
+**Linux**
+```bash
+chmod +x scripts/run-all-services.sh
+./scripts/run-all-services.sh
+```
+
+Gateway docs:
+```text
+http://localhost:8000/docs
+```
+
+---
+
+## 11. Run tests
+
+Run all infrastructure, schema, and gateway tests.
+
+**Windows**
+```powershell
+.\scripts\test-all.ps1
+```
+
+**Linux**
+```bash
+chmod +x scripts/test-all.sh
+./scripts/test-all.sh
+```
+
+What it runs:
+- Infrastructure integration tests
+- Database schema tests
+- Gateway async tests inside Docker container
+
+---
+
+## 12. Daily workflow
 
 ```powershell
-# Users — expect 10
-docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT COUNT(*) FROM users;"
-
-# Agents — expect 4 rows, one per type
-docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT type, COUNT(*) FROM agents GROUP BY type ORDER BY type;"
-
-# Runs — expect completed=30, failed=10, pending=10
-docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT status, COUNT(*) FROM runs GROUP BY status ORDER BY status;"
-
-# Tasks — expect 200
-docker compose exec postgres psql -U nexus -d nexus_db -c "SELECT COUNT(*) FROM tasks;"
-```
-
----
-
-## 9. Verify infrastructure
-
-```bash
-# All 4 stateful containers must show healthy
-docker compose ps
-
-# Redis
-docker compose exec redis redis-cli -a <your_redis_password> PING
-# Expected: PONG
-
-# Kafka topics
-docker compose exec kafka kafka-topics --bootstrap-server localhost:9092 --list
-# Expected: nexus.tasks  nexus.results  nexus.events
-
-# Integration tests
-python -m pytest tests/integration/test_infra.py -v
-# Expected: 7 passed
-```
-
----
-
-## 10. Daily workflow
-
-```bash
-# cd into nexus — pyenv switches to 3.11.9 automatically
-cd nexus
-python --version   # 3.11.9
+# Verify prerequisites
+.\scripts\check-prerequisites.ps1
 
 # Start infra
-.\scripts\start-infra.ps1   # Windows
-./scripts/start-infra.sh    # Linux
+.\scripts\start-infra.ps1
 
-# Run the service you are working on today
-cd services/gateway
-python -m uvicorn main:app --reload --port 8000
+# Start services
+.\scripts\run-all-services.ps1
 
-# Stop at end of day
-.\scripts\stop-all.ps1      # Windows
-docker compose down          # Linux
+# Run tests
+.\scripts\test-all.ps1
+
+# Stop everything
+.\scripts\stop-all.ps1
 ```

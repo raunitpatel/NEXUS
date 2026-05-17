@@ -1,0 +1,50 @@
+# nexus/scripts/test-all.ps1
+
+$ErrorActionPreference = "Stop"
+
+Write-Host "Running NEXUS test suite..." -ForegroundColor Cyan
+
+# =========================================================
+# Infrastructure tests
+# =========================================================
+
+Write-Host ""
+Write-Host "Running infrastructure integration tests..." -ForegroundColor Yellow
+
+python -m pytest tests/integration/test_infra.py -v
+
+# =========================================================
+# Database schema tests
+# =========================================================
+
+Write-Host ""
+Write-Host "Running database schema tests..." -ForegroundColor Yellow
+
+python -m pytest db/tests/test_schema.py -v
+
+# =========================================================
+# Gateway service tests
+# =========================================================
+
+Write-Host ""
+Write-Host "Finding nexus-gateway container..." -ForegroundColor Yellow
+
+$gatewayContainer = docker ps `
+    --filter "name=nexus-gateway" `
+    --format "{{.ID}}"
+
+if (-not $gatewayContainer) {
+    Write-Host "[ERROR] nexus-gateway container is not running." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Gateway container: $gatewayContainer" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Running gateway async tests inside container..." -ForegroundColor Yellow
+
+docker exec -it $gatewayContainer `
+    python -m pytest tests/ -v --asyncio-mode=auto
+
+Write-Host ""
+Write-Host "All tests completed." -ForegroundColor Green

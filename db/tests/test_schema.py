@@ -6,7 +6,7 @@ Requires:
     docker compose up -d postgres
 
 Run:
-    python -m pytest tests/db/test_schema.py -v
+    python -m pytest db/tests/test_schema.py -v
 """
 
 import os

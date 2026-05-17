@@ -14,6 +14,9 @@ from __future__ import annotations
 import socket
 from dotenv import load_dotenv  
 import os
+import psycopg2 
+from sqlalchemy.engine import make_url
+
 
 import pytest
 
@@ -41,15 +44,18 @@ class TestPostgresReachability:
 
     def test_postgres_pgvector_extension(self) -> None:
         """pgvector extension must be installed in nexus_db."""
-        import psycopg2  # type: ignore[import]
+
+        database_url = os.getenv("DATABASE_URL_LOCAL")
+
+
+        url = make_url(database_url)
 
         conn = psycopg2.connect(
-            host="localhost",
-            port=os.getenv("POSTGRES_PORT", 5432
-            ),
-            user=os.getenv("POSTGRES_USER", "nexus"),
-            password=os.getenv("POSTGRES_PASSWORD"),
-            dbname=os.getenv("POSTGRES_DB", "nexus_db"),
+            host=url.host,
+            port=url.port,
+            user=url.username,
+            password=url.password,
+            dbname=url.database,
             connect_timeout=15,
         )
         try:
