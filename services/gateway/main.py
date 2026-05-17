@@ -20,6 +20,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from config import settings
 from middleware.auth import AuthMiddleware
+from middleware.rate_limit import RateLimitMiddleware
 from routers import auth, runs
 
 from shared.logging import configure_logging
@@ -93,6 +94,8 @@ def create_app() -> FastAPI:
     )
 
     # JWT auth middleware - runs on every request except /api/v1/auth/* and /healthz
+    # Starlette executes middleware in reverse registration order.
+    app.add_middleware(RateLimitMiddleware)
     app.add_middleware(AuthMiddleware)
 
     # Prometheus metric auto-instrumentation

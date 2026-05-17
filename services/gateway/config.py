@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # CORS (comma-separated origins)
     cors_origins: str = "http://localhost:3000"
 
+    # Rate limiting
+    rate_limit_requests_per_minute: int = 60
+    rate_limit_burst: int = 10
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse comma-separated CORS origins into a list."""

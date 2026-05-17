@@ -38,12 +38,24 @@ Write-Host "Running nexus-gateway..." -ForegroundColor Yellow
 
 docker rm -f nexus-gateway 2>$null
 
+#  for production
+# docker run -d `
+#     --name nexus-gateway `
+#     --network agent-net `
+#     --env-file services/gateway/.env `
+#     -p 8000:8000 `
+#     nexus-gateway
+
+# for development
 docker run -d `
     --name nexus-gateway `
     --network agent-net `
     --env-file services/gateway/.env `
     -p 8000:8000 `
-    nexus-gateway
+    -v ${PWD}/services/gateway:/app `
+    -v ${PWD}/services/shared:/app/shared `
+    nexus-gateway `
+    uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 # =========================
 # Future Services

@@ -131,8 +131,6 @@ services:
       start_period: 40s
 
   # ── NGINX reverse proxy ───────────────────────────────────────────────────
-  # NOTE: nginx depends_on application services which are added in AGNT-003+.
-  # In AGNT-001 nginx is defined but starts in a degraded state (no upstreams).
   # The upstream blocks are populated as services are added.
   nginx:
     image: nginx:1.25-alpine

@@ -1,4 +1,5 @@
-"""Unit tests for services/gateway/middleware/auth.py.
+"""
+Unit tests for services/gateway/middleware/auth.py.
 
 Verifies that the AuthMiddleware correctly allows, blocks, and exempts requests.
 All Redis calls are mocked.
