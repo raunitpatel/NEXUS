@@ -41,16 +41,23 @@ class Settings(BaseSettings):
     kafka_topic_events: str = "nexus.events"
     kafka_consumer_group_orchestrator: str = "nexus-orchestrator"
 
-    # LLM — Ollama (local, no API key required for portfolio demo)
-    # When swapping to Claude post-portfolio, only OllamaProvider instantiation
-    # in llm_provider.py changes — nothing else in this service touches these.
+    # LLM Provider selection
+    llm_provider: str = "ollama"
+
+    # Ollama settings (used when llm_provider == "ollama")
     ollama_base_url: str = "http://host.docker.internal:11434"
-    ollama_model: str = "llama3.2"
+    ollama_model: str = "qwen3:7b"
+    ollama_timeout_seconds: int = 60
 
-    # Anthropic — reserved for future provider swap, not used in AGNT-007/008
+    # Anthropic
     anthropic_api_key: str = "sk-ant-placeholder"
+    anthropic_model: str = "claude-sonnet-4-6"
+    anthropic_timeout_seconds: int = 60
 
-
+    # Gemini
+    gemini_api_key: str = "gemini_api_key"
+    gemini_model: str = "gemini-2.5-flash"
+    gemini_timeout_seconds: int = 60
 
     # Internal agent URLs
     search_agent_url: str = "http://search-agent:8002"

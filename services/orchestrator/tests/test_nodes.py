@@ -1,135 +1,257 @@
 # services/orchestrator/tests/test_nodes.py
 """
-Unit tests for all 8 orchestrator node stub functions.
+Unit tests for orchestrator nodes: decompose_query and synthesize_output.
 
-Each node is tested in isolation with a minimal OrchestratorState.
-No external dependencies — all stubs are pure functions.
-Token counter fields (input_tokens, output_tokens) are included in the
-fixture because AGNT-008 node implementations will read and increment them.
+All external dependencies (LLMProvider, Kafka) are mocked.
+No Docker containers required.
+
+Run:
+    cd nexus
+    python -m pytest services/orchestrator/tests/test_nodes.py -v --asyncio-mode=auto
 """
+
+from __future__ import annotations
+
+import json
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from state import OrchestratorState
+from llm_provider import LLMResponse
+from state import OrchestratorState, TaskResult
 
 
-def _base_state() -> OrchestratorState:
-    """Return a minimal valid OrchestratorState for testing."""
-    return {
-        "run_id": "test-run-001",
-        "user_id": "test-user-001",
-        "query": "test query",
-        "task_plan": [],
-        "completed_tasks": [],
-        "pending_task": None,
-        "task_result": None,
-        "retry_count": 0,
-        "final_output": None,
-        "status": "pending",
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+def _base_state(**overrides: Any) -> OrchestratorState:
+    """Return a minimal OrchestratorState for testing."""
+    state: OrchestratorState = {
+        "run_id": "run_test_001",
+        "user_id": "user_test_001",
+        "query": "What are the latest papers on LLM reasoning?",
+        "plan": [],
+        "dispatched_task_ids": [],
+        "task_results": [],
+        "final_output": "",
+        "status": "running",
         "error": None,
-        "input_tokens": 0,
-        "output_tokens": 0,
-        "metadata": {},
+        "total_prompt_tokens": 0,
+        "total_completion_tokens": 0,
     }
+    state.update(overrides)  # type: ignore[typeddict-item]
+    return state
+
+
+def _mock_llm_response(content: str, prompt_tokens: int = 100, completion_tokens: int = 50) -> LLMResponse:
+    """Return a fake LLMResponse."""
+    return LLMResponse(
+        content=content,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+    )
+
+
+# ---------------------------------------------------------------------------
+# decompose_query tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_decompose_query_returns_valid_plan() -> None:
+    """decompose_query with valid LLM JSON returns state with list[TaskPlan]."""
+    valid_plan_json = json.dumps({
+        "tasks": [
+            {"agent_type": "search", "description": "Find recent LLM reasoning papers", "depends_on": []},
+            {"agent_type": "memory_read", "description": "Check prior research context", "depends_on": []},
+            {"agent_type": "synthesize", "description": "Combine results", "depends_on": ["0", "1"]},
+        ]
+    })
+
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(
+        return_value=_mock_llm_response(valid_plan_json, prompt_tokens=200, completion_tokens=80)
+    )
+
+    with (
+        patch("nodes.decompose_query.get_llm_provider", return_value=mock_provider),
+        patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
+    ):
+        from nodes.decompose_query import decompose_query
+
+        result = await decompose_query(_base_state())
+
+    assert "plan" in result
+    plan = result["plan"]
+    assert len(plan) == 3
+    assert plan[0]["agent_type"] == "search"
+    assert plan[1]["agent_type"] == "memory_read"
+    assert plan[2]["agent_type"] == "synthesize"
+    assert all(t["task_id"] for t in plan)  # UUIDs assigned
 
 
 @pytest.mark.asyncio
-async def test_decompose_query_stub_sets_running_status() -> None:
-    """decompose_query stub sets status='running' and returns empty task_plan."""
-    from nodes.decompose_query import decompose_query
+async def test_decompose_query_updates_token_counts() -> None:
+    """decompose_query accumulates prompt and completion tokens on state."""
+    valid_plan_json = json.dumps({
+        "tasks": [
+            {"agent_type": "tool", "description": "Calculate compound interest", "depends_on": []}
+        ]
+    })
 
-    result = await decompose_query(_base_state())
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(
+        return_value=_mock_llm_response(valid_plan_json, prompt_tokens=150, completion_tokens=60)
+    )
 
-    assert result["status"] == "running"
-    assert result["task_plan"] == []
-    assert result["run_id"] == "test-run-001"
+    with (
+        patch("nodes.decompose_query.get_llm_provider", return_value=mock_provider),
+        patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
+    ):
+        from nodes.decompose_query import decompose_query
 
+        result = await decompose_query(_base_state(total_prompt_tokens=50, total_completion_tokens=20))
 
-@pytest.mark.asyncio
-async def test_validate_plan_stub_returns_state_unchanged() -> None:
-    """validate_plan stub returns state unchanged."""
-    from nodes.validate_plan import validate_plan
-
-    state = _base_state()
-    result = await validate_plan(state)
-
-    assert result == state
-
-
-@pytest.mark.asyncio
-async def test_dispatch_next_task_stub_returns_state_unchanged() -> None:
-    """dispatch_next_task stub returns state unchanged."""
-    from nodes.dispatch_next_task import dispatch_next_task
-
-    state = _base_state()
-    result = await dispatch_next_task(state)
-
-    assert result == state
+    assert result["total_prompt_tokens"] == 200   # 50 existing + 150 new
+    assert result["total_completion_tokens"] == 80  # 20 existing + 60 new
 
 
 @pytest.mark.asyncio
-async def test_await_task_result_stub_returns_state_unchanged() -> None:
-    """await_task_result stub returns state unchanged."""
-    from nodes.await_task_result import await_task_result
+async def test_decompose_query_publishes_kafka_event() -> None:
+    """decompose_query calls _publish_thought_event once."""
+    valid_plan_json = json.dumps({
+        "tasks": [
+            {"agent_type": "search", "description": "Find info", "depends_on": []}
+        ]
+    })
 
-    state = _base_state()
-    result = await await_task_result(state)
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(return_value=_mock_llm_response(valid_plan_json))
 
-    assert result == state
+    mock_publish = AsyncMock()
 
+    with (
+        patch("nodes.decompose_query.get_llm_provider", return_value=mock_provider),
+        patch("nodes.decompose_query._publish_thought_event", mock_publish),
+    ):
+        from nodes.decompose_query import decompose_query
+        await decompose_query(_base_state())
 
-@pytest.mark.asyncio
-async def test_record_result_stub_returns_state_unchanged() -> None:
-    """record_result stub returns state unchanged."""
-    from nodes.record_result import record_result
-
-    state = _base_state()
-    result = await record_result(state)
-
-    assert result == state
-
-
-@pytest.mark.asyncio
-async def test_synthesize_output_stub_sets_completed_and_empty_output() -> None:
-    """synthesize_output stub sets status='completed' and final_output=''."""
-    from nodes.synthesize_output import synthesize_output
-
-    result = await synthesize_output(_base_state())
-
-    assert result["status"] == "completed"
-    assert result["final_output"] == ""
+    mock_publish.assert_awaited_once()
+    call_kwargs = mock_publish.call_args
+    assert call_kwargs.kwargs["run_id"] == "run_test_001"
 
 
 @pytest.mark.asyncio
-async def test_finalize_run_stub_returns_state_unchanged() -> None:
-    """finalize_run stub returns state unchanged."""
-    from nodes.finalize_run import finalize_run
+async def test_decompose_query_raises_on_invalid_agent_type() -> None:
+    """decompose_query raises OrchestratorError when LLM returns unknown agent_type."""
+    bad_json = json.dumps({
+        "tasks": [
+            {"agent_type": "browser", "description": "Open Google", "depends_on": []}
+        ]
+    })
 
-    state = _base_state()
-    result = await finalize_run(state)
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(return_value=_mock_llm_response(bad_json))
 
-    assert result == state
+    with (
+        patch("nodes.decompose_query.get_llm_provider", return_value=mock_provider),
+        patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
+    ):
+        from nodes.decompose_query import decompose_query, OrchestratorError
+
+        with pytest.raises(OrchestratorError, match="invalid task plan JSON"):
+            await decompose_query(_base_state())
 
 
 @pytest.mark.asyncio
-async def test_handle_error_increments_retry_count() -> None:
-    """handle_error increments retry_count by 1 and sets status='failed'."""
-    from nodes.handle_error import handle_error
+async def test_decompose_query_raises_on_empty_plan() -> None:
+    """decompose_query raises OrchestratorError when LLM returns 0 tasks."""
+    empty_json = json.dumps({"tasks": []})
 
-    state = {**_base_state(), "retry_count": 1, "error": "search timeout"}
-    result = await handle_error(state)
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(return_value=_mock_llm_response(empty_json))
 
-    assert result["retry_count"] == 2
-    assert result["status"] == "failed"
+    with (
+        patch("nodes.decompose_query.get_llm_provider", return_value=mock_provider),
+        patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
+    ):
+        from nodes.decompose_query import decompose_query, OrchestratorError
+
+        with pytest.raises(OrchestratorError, match="1–6 tasks"):
+            await decompose_query(_base_state())
+
+
+# ---------------------------------------------------------------------------
+# synthesize_output tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_synthesize_output_sets_final_output() -> None:
+    """synthesize_output sets non-empty final_output on state."""
+    synthesis_text = "The latest LLM reasoning papers focus on chain-of-thought prompting..."
+
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(
+        return_value=_mock_llm_response(synthesis_text, prompt_tokens=300, completion_tokens=120)
+    )
+
+    task_results: list[TaskResult] = [
+        TaskResult(
+            task_id="task-001",
+            agent_type="search",
+            output="Wei et al. 2022 chain-of-thought paper...",
+            error=None,
+            duration_ms=1200,
+        )
+    ]
+
+    with (
+        patch("nodes.synthesize_output.get_llm_provider", return_value=mock_provider),
+        patch("nodes.synthesize_output._publish_llm_response_event", new_callable=AsyncMock),
+    ):
+        from nodes.synthesize_output import synthesize_output
+
+        result = await synthesize_output(_base_state(task_results=task_results))
+
+    assert result["final_output"] == synthesis_text
+    assert result["total_prompt_tokens"] == 300
+    assert result["total_completion_tokens"] == 120
 
 
 @pytest.mark.asyncio
-async def test_handle_error_starts_from_zero() -> None:
-    """handle_error on first error sets retry_count=1."""
-    from nodes.handle_error import handle_error
+async def test_synthesize_output_publishes_kafka_event() -> None:
+    """synthesize_output calls _publish_llm_response_event once with run_id."""
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(
+        return_value=_mock_llm_response("Final answer here.")
+    )
+    mock_publish = AsyncMock()
 
-    state = {**_base_state(), "error": "llm parse error"}
-    result = await handle_error(state)
+    with (
+        patch("nodes.synthesize_output.get_llm_provider", return_value=mock_provider),
+        patch("nodes.synthesize_output._publish_llm_response_event", mock_publish),
+    ):
+        from nodes.synthesize_output import synthesize_output
+        await synthesize_output(_base_state())
 
-    assert result["retry_count"] == 1
-    assert result["status"] == "failed"
+    mock_publish.assert_awaited_once()
+    assert mock_publish.call_args.kwargs["run_id"] == "run_test_001"
+
+
+@pytest.mark.asyncio
+async def test_synthesize_output_raises_on_empty_llm_response() -> None:
+    """synthesize_output raises OrchestratorError when LLM returns empty string."""
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(return_value=_mock_llm_response("   "))
+
+    with (
+        patch("nodes.synthesize_output.get_llm_provider", return_value=mock_provider),
+        patch("nodes.synthesize_output._publish_llm_response_event", new_callable=AsyncMock),
+    ):
+        from nodes.synthesize_output import synthesize_output
+        from nodes.decompose_query import OrchestratorError
+
+        with pytest.raises(OrchestratorError, match="empty final_output"):
+            await synthesize_output(_base_state())
