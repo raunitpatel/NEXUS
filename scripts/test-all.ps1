@@ -46,5 +46,29 @@ Write-Host "Running gateway async tests inside container..." -ForegroundColor Ye
 docker exec -it $gatewayContainer `
     python -m pytest tests/ -v --asyncio-mode=auto
 
+# =========================================================
+# Orchestrator service tests
+# =========================================================
+
+Write-Host ""
+Write-Host "Finding nexus-orchestrator container..." -ForegroundColor Yellow
+
+$orchestratorContainer = docker ps `
+    --filter "name=nexus-orchestrator" `
+    --format "{{.ID}}"
+
+if (-not $orchestratorContainer) {
+    Write-Host "[ERROR] nexus-orchestrator container is not running." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Orchestrator container: $orchestratorContainer" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Running orchestrator async tests inside container..." -ForegroundColor Yellow
+
+docker exec -it $orchestratorContainer `
+    python -m pytest tests/ -v --asyncio-mode=auto
+
 Write-Host ""
 Write-Host "All tests completed." -ForegroundColor Green
