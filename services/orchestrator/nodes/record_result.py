@@ -71,7 +71,7 @@ async def _update_task_record(
                 UPDATE tasks
                 SET
                     status       = :status,
-                    output       = :output::jsonb,
+                    output       = CAST(:output AS jsonb),
                     error        = :error,
                     completed_at = NOW()
                 WHERE id = :task_id

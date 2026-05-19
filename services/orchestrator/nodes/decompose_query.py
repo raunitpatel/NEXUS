@@ -31,7 +31,6 @@ _VALID_AGENT_TYPES: set[str] = {
     "memory_read",
     "memory_write",
     "tool",
-    "synthesize",
 }
  
  
@@ -71,26 +70,35 @@ Available agent types and their capabilities:
 - memory_read: Retrieve relevant context from past agent runs via semantic search
 - memory_write: Store important information into the vector memory store
 - tool: Calculator, weather lookup, Wikipedia queries
-- synthesize: Combine results from other tasks into a final answer (use as final step only)
- 
+
 Rules:
 1. Return ONLY valid JSON. No prose, no markdown, no code fences.
 2. The JSON must be an object with a single key "tasks" containing an array.
 3. Each task object must have: "agent_type" (string), "description" (string), \
 "depends_on" (array of task indices as strings, empty if no dependency).
 4. Minimum 1 task, maximum 6 tasks.
-5. Do not include a "synthesize" task unless there are other tasks to synthesize.
-6. Task indices in depends_on refer to the position (0-based) of tasks in the array.
- 
+5. Task indices in depends_on refer to the position (0-based) of tasks in the array.
+
 Example output:
-{"tasks": [
-  {"agent_type": "search", "description": "Find recent papers on transformer attention", \
-"depends_on": []},
-  {"agent_type": "memory_read", "description": "Check prior context on transformers", \
-"depends_on": []},
-  {"agent_type": "synthesize", "description": "Combine results into a summary", \
-"depends_on": ["0", "1"]}
-]}
+{
+    "tasks": [
+        {
+            "agent_type": "memory_read",
+            "description": "Retrieve previous stored context about Kafka orchestration systems",
+            "depends_on": []
+        },
+        {
+            "agent_type": "search",
+            "description": "Find latest best practices for Kafka orchestration",
+            "depends_on": []
+        },
+        {
+            "agent_type": "code",
+            "description": "Generate an architecture diagram and implementation example combining prior context and latest practices",
+            "depends_on": ["0", "1"]
+        }
+    ]
+}
 """
  
  

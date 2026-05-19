@@ -72,3 +72,29 @@ docker exec -it $orchestratorContainer `
 
 Write-Host ""
 Write-Host "All tests completed." -ForegroundColor Green
+
+
+# =========================================================
+# Search Agent service tests
+# =========================================================
+
+Write-Host ""
+Write-Host "Finding nexus-search-agent container..." -ForegroundColor Yellow
+
+$searchAgentContainer = docker ps `
+    --filter "name=nexus-search-agent" `
+    --format "{{.ID}}"
+
+if (-not $searchAgentContainer) {
+    Write-Host "[ERROR] nexus-search-agent container is not running." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Search Agent container: $searchAgentContainer" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Running search agent async tests inside container..." -ForegroundColor Yellow
+
+docker exec -it $searchAgentContainer `
+    python -m pytest tests/ -v --asyncio-mode=auto
+

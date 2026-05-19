@@ -22,7 +22,7 @@ from state import OrchestratorState
 logger = structlog.get_logger(__name__)
 
 _VALID_AGENT_TYPES = frozenset({
-    "search", "code", "memory_read", "memory_write", "tool", "synthesize",
+    "search", "code", "memory_read", "memory_write", "tool",
 })
 
 

@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS tasks (
     completed_at  TIMESTAMPTZ,
 
     CONSTRAINT tasks_status_values CHECK (status IN ('pending', 'running', 'completed', 'failed', 'retrying')),
-    CONSTRAINT tasks_type_values CHECK (type IN ('search', 'code', 'memory_read', 'memory_write', 'tool', 'synthesize')),
+    CONSTRAINT tasks_type_values CHECK (type IN ('search', 'code', 'memory_read', 'memory_write', 'tool')),
     CONSTRAINT tasks_attempt_positive CHECK (attempt >= 1),
     CONSTRAINT tasks_attempt_max CHECK (attempt <= 5)
 );

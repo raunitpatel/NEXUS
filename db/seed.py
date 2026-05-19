@@ -127,8 +127,8 @@ RUN_STATUS_DISTRIBUTION: list[str] = (
 # Schema constraint: status IN ('pending', 'running', 'completed', 'failed', 'retrying')
 TASK_STATUSES: list[str] = ["completed", "failed", "pending", "running"]
 
-# Schema constraint: type IN ('search', 'code', 'memory_read', 'memory_write', 'tool', 'synthesize')
-TASK_TYPES: list[str] = ["search", "code", "memory_read", "memory_write", "tool", "synthesize"]
+# Schema constraint: type IN ('search', 'code', 'memory_read', 'memory_write', 'tool')
+TASK_TYPES: list[str] = ["search", "code", "memory_read", "memory_write", "tool"]
 
 LATENCY_MEAN_MS: float = 3000.0
 LATENCY_STDDEV_MS: float = 1500.0

@@ -72,8 +72,7 @@ async def test_decompose_query_returns_valid_plan() -> None:
     valid_plan_json = json.dumps({
         "tasks": [
             {"agent_type": "search", "description": "Find recent LLM reasoning papers", "depends_on": []},
-            {"agent_type": "memory_read", "description": "Check prior research context", "depends_on": []},
-            {"agent_type": "synthesize", "description": "Combine results", "depends_on": ["0", "1"]},
+            {"agent_type": "memory_read", "description": "Check prior research context", "depends_on": ["0", "1"]},
         ]
     })
 
@@ -92,10 +91,9 @@ async def test_decompose_query_returns_valid_plan() -> None:
 
     assert "task_plan" in result
     plan = result["task_plan"]
-    assert len(plan) == 3
+    assert len(plan) == 2
     assert plan[0]["agent_type"] == "search"
     assert plan[1]["agent_type"] == "memory_read"
-    assert plan[2]["agent_type"] == "synthesize"
     assert all(t["task_id"] for t in plan)  # UUIDs assigned
 
 
@@ -316,9 +314,9 @@ async def test_validate_plan_valid_returns_empty_dict() -> None:
 
     valid_plan = [
         {"task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://search-agent:8002", "input": {}, "depends_on": []},
-        {"task_id": "t2", "agent_type": "synthesize", "task_type": "synthesize",
-        "agent_url": "", "input": {}, "depends_on": ["0"]},
+        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": []},
+        {"task_id": "t2", "agent_type": "tool", "task_type": "tool",
+        "agent_url": "http://nexus-tool-agent:8005", "input": {}, "depends_on": ["0"]},
     ]
     result = await validate_plan(_base_state(task_plan=valid_plan))
     assert result["task_plan"] == valid_plan
@@ -336,7 +334,7 @@ async def test_dispatch_next_task_posts_to_correct_url() -> None:
 
     task_plan = [{
         "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://search-agent:8002", "input": {"query": "test"}, "depends_on": [],
+        "agent_url": "http://nexus-search-agent:8002", "input": {"query": "test"}, "depends_on": [],
     }]
 
     mock_response = MagicMock()
@@ -368,7 +366,7 @@ async def test_dispatch_next_task_timeout_sets_error() -> None:
 
     task_plan = [{
         "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://search-agent:8002", "input": {}, "depends_on": [],
+        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": [],
     }]
 
     mock_client = AsyncMock()
@@ -391,9 +389,9 @@ async def test_dispatch_next_task_skips_completed() -> None:
 
     task_plan = [
         {"task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://search-agent:8002", "input": {}, "depends_on": []},
+        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": []},
         {"task_id": "t2", "agent_type": "tool", "task_type": "tool",
-        "agent_url": "http://tool-agent:8005", "input": {}, "depends_on": []},
+        "agent_url": "http://nexus-tool-agent:8005", "input": {}, "depends_on": []},
     ]
     completed = [{"task_id": "t1", "agent_type": "search", "output": {}, "error": None, "duration_ms": 100, "attempt": 1}]
 
@@ -425,7 +423,7 @@ async def test_await_task_result_normalises_success_response() -> None:
 
     pending = {
         "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://search-agent:8002", "input": {}, "depends_on": [],
+        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": [],
         "_response": {"output": {"results": ["r1"]}, "error": None},
         "_elapsed_ms": 1200, "_attempt": 1,
     }
@@ -444,7 +442,7 @@ async def test_await_task_result_propagates_agent_error() -> None:
 
     pending = {
         "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://search-agent:8002", "input": {}, "depends_on": [],
+        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": [],
         "_response": {"output": None, "error": "search API unavailable"},
         "_elapsed_ms": 500, "_attempt": 1,
     }
