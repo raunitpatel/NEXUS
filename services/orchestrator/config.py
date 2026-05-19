@@ -47,17 +47,17 @@ class Settings(BaseSettings):
     # Ollama settings (used when llm_provider == "ollama")
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "qwen3:7b"
-    ollama_timeout_seconds: int = 60
+    ollama_timeout_seconds: int = 120
 
     # Anthropic
     anthropic_api_key: str = "sk-ant-placeholder"
-    anthropic_model: str = "claude-sonnet-4-6"
-    anthropic_timeout_seconds: int = 60
+    anthropic_model: str = "claude-sonnet-4-20250514"
+    anthropic_timeout_seconds: int = 120
 
     # Gemini
     gemini_api_key: str = "gemini_api_key"
     gemini_model: str = "gemini-2.5-flash"
-    gemini_timeout_seconds: int = 60
+    gemini_timeout_seconds: int = 120
 
     # Internal agent URLs
     search_agent_url: str = "http://search-agent:8002"

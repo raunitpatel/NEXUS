@@ -10,12 +10,18 @@ that routing logic works even with stub implementations everywhere else.
 import structlog
 
 from state import OrchestratorState
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+_db_engine: AsyncEngine | None = None
+def set_db_engine(engine: AsyncEngine) -> None:
+    global _db_engine
+    _db_engine = engine
 
 logger = structlog.get_logger(__name__)
 
-
 async def handle_error(state: OrchestratorState) -> OrchestratorState:
-    """Increment retry_count and set status='failed'.
+    """
+    Increment retry_count, set status='failed', and insert an events row.
 
     Args:
         state: Current OrchestratorState with error set by the failing node.
@@ -23,14 +29,49 @@ async def handle_error(state: OrchestratorState) -> OrchestratorState:
     Returns:
         Updated state with retry_count incremented by 1 and status='failed'.
     """
+
     current_retry = state.get("retry_count", 0)
+    run_id = state["run_id"]
+    error_msg = state.get("error", "unknown error")
+
     logger.warning(
         "node.handle_error",
-        run_id=state["run_id"],
-        error=state.get("error"),
+        run_id=run_id,
+        error=error_msg,
         retry_count=current_retry,
     )
-    # --- AGNT-010: DB error event INSERT replaces stub logging ---
+
+    # Insert error event row if DB is available
+    if _db_engine is not None:
+        try:
+            import json
+            from sqlalchemy import text
+            from sqlalchemy.ext.asyncio import async_sessionmaker
+            session_factory = async_sessionmaker(
+                bind=_db_engine,
+                expire_on_commit=False,
+                autoflush=False,
+            )
+            async with session_factory() as session:
+                await session.execute(
+                    text(
+                        """
+                        INSERT INTO events (run_id, type, payload, source)
+                        VALUES (:run_id, 'run_error', CAST(:payload AS jsonb), 'orchestrator.handle_error')
+                        """
+                    ),
+                    {
+                        "run_id": run_id,
+                        "payload": json.dumps({
+                            "error": error_msg,
+                            "retry_count": current_retry,
+                        }),
+                    },
+                )
+                await session.commit()
+        except Exception as exc:
+            logger.error("node.handle_error.db_error", run_id=run_id, error=str(exc))
+
     return {
         **state,
         "retry_count": current_retry + 1,
