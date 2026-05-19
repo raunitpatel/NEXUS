@@ -102,7 +102,15 @@ class TavilySearchProvider(BaseSearchProvider):
 
 # Mock Provider
 
+# Mock Provider
+
 class MockSearchProvider(BaseSearchProvider):
+
+    def __init__(
+        self,
+        max_results: int = 5,
+    ) -> None:
+        self._max_results = max_results
 
     async def search(
         self,
@@ -111,7 +119,7 @@ class MockSearchProvider(BaseSearchProvider):
 
         await asyncio.sleep(0.2)
 
-        return [
+        results: list[SearchResult] = [
             {
                 "title": f"Overview: {query[:40]}",
                 "url": "https://example.com/overview",
@@ -120,7 +128,7 @@ class MockSearchProvider(BaseSearchProvider):
                     "This resource covers key concepts, recent developments, "
                     "and practical applications in the field."
                 ),
-                "relevance_score": 0.0,
+                "relevance_score": 0,
             },
             {
                 "title": f"Deep dive: {query[:35]} — Research Paper",
@@ -164,6 +172,7 @@ class MockSearchProvider(BaseSearchProvider):
             },
         ]
 
+        return results[: self._max_results]
 
 # Main Tool Wrapper
 
@@ -201,7 +210,9 @@ class WebSearchTool:
             )
 
         if provider == "mock":
-            return MockSearchProvider()
+            return MockSearchProvider(
+                max_results=max_results,
+            )
 
         raise ValueError(
             f"Unsupported provider: {provider}"

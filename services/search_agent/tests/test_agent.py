@@ -291,7 +291,11 @@ async def test_web_search_tool_returns_max_results() -> None:
     """WebSearchTool.search() returns exactly max_results items."""
     from tools.web_search import WebSearchTool
 
-    tool = WebSearchTool(api_key="x", base_url="http://x", max_results=3)
+    tool = WebSearchTool(
+        provider="mock",
+        api_key="x",
+        max_results=3,
+    )
     results = await tool.search("test query")
 
     assert len(results) == 3
@@ -302,7 +306,11 @@ async def test_web_search_tool_result_has_required_fields() -> None:
     """All SearchResult dicts have title, url, snippet, relevance_score."""
     from tools.web_search import WebSearchTool
 
-    tool = WebSearchTool(api_key="x", base_url="http://x", max_results=5)
+    tool = WebSearchTool(
+        provider="mock",
+        api_key="x",
+        max_results=3,
+    )
     results = await tool.search("LLM reasoning")
 
     for r in results:

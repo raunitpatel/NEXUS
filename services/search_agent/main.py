@@ -60,7 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     logger.info("search_agent.shutdown")
-    await redis_client.close()
+    await redis_client.aclose()
     await KafkaProducerFactory.close()
 
 

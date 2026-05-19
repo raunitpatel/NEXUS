@@ -32,7 +32,6 @@ AgentType = Literal[
     "memory_read",
     "memory_write",
     "tool",
-    "synthesize",
 ]
 
 TaskStatus = Literal[
@@ -58,6 +57,7 @@ EventType = Literal[
     "memory_read",
     "memory_write",
     "llm_response",
+    "code_iteration"
 ]
 
 

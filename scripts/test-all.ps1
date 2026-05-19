@@ -98,3 +98,29 @@ Write-Host "Running search agent async tests inside container..." -ForegroundCol
 docker exec -it $searchAgentContainer `
     python -m pytest tests/ -v --asyncio-mode=auto
 
+
+# =========================================================
+# Code Agent service tests
+# =========================================================
+
+Write-Host ""
+Write-Host "Finding nexus-code-agent container..." -ForegroundColor Yellow
+
+$searchAgentContainer = docker ps `
+    --filter "name=nexus-code-agent" `
+    --format "{{.ID}}"
+
+if (-not $searchAgentContainer) {
+    Write-Host "[ERROR] nexus-code-agent container is not running." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Code Agent container: $searchAgentContainer" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Running code agent async tests inside container..." -ForegroundColor Yellow
+
+docker exec -it $searchAgentContainer `
+    python -m pytest tests/ -v --asyncio-mode=auto
+
+

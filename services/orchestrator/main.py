@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
     logger.info("orchestrator.shutdown")
-    await redis_client.close()
+    await redis_client.aclose()
     await engine.dispose()
 
 # Request / response models

@@ -184,6 +184,55 @@ docker run -d `
     nexus-search-agent `
     uvicorn main:app --host 0.0.0.0 --port 8002 --reload
 
+# =========================================================
+# Code Agent
+# =========================================================
+
+Write-Host ""
+Write-Host "Preparing nexus-code-agent..." -ForegroundColor Yellow
+
+$codeAgentImage = docker images -q nexus-code-agent
+
+if (-not $codeAgentImage) {
+
+    docker build `
+        -f services/code_agent/Dockerfile `
+        -t nexus-code-agent .
+} else {
+
+    Write-Host "nexus-code-agent image already exists. Skipping build." -ForegroundColor Green
+}
+
+Write-Host "Running nexus-code-agent..." -ForegroundColor Yellow
+
+docker rm -f nexus-code-agent 2>$null
+
+# -------------------------
+# Production
+# -------------------------
+
+# docker run -d `
+#     --name nexus-code-agent `
+#     --network agent-net `
+#     --env-file services/code_agent/.env `
+#     -p 8003:8003 `
+#     nexus-code-agent
+
+# -------------------------
+# Development
+# -------------------------
+
+
+docker run -d `
+    --name nexus-code-agent `
+    --network agent-net `
+    --env-file services/code_agent/.env `
+    -p 8003:8003 `
+    -v "${PWD}/services/code_agent:/app" `
+    -v "${PWD}/services/shared:/app/shared" `
+    nexus-code-agent `
+    uvicorn main:app --host 0.0.0.0 --port 8003 --reload
+
 
 # =========================================================
 # Future Services
@@ -242,33 +291,6 @@ docker run -d `
 #     nexus-tool-agent `
 #     uvicorn main:app --host 0.0.0.0 --port 8004 --reload
 
-
-# =========================================================
-# Code Agent
-# =========================================================
-
-# $codeAgentImage = docker images -q nexus-code-agent
-#
-# if (-not $codeAgentImage) {
-#
-#     docker build `
-#         -f services/code_agent/Dockerfile `
-#         -t nexus-code-agent .
-# }
-#
-# docker rm -f nexus-code-agent 2>$null
-#
-# docker run -d `
-#     --name nexus-code-agent `
-#     --network agent-net `
-#     --env-file services/code_agent/.env `
-#     -p 8005:8005 `
-#     -v "${PWD}/services/code_agent:/app" `
-#     -v "${PWD}/services/shared:/app/shared" `
-#     nexus-code-agent `
-#     uvicorn main:app --host 0.0.0.0 --port 8005 --reload
-
-
 # =========================================================
 # Success Output
 # =========================================================
@@ -279,3 +301,4 @@ Write-Host "NEXUS services started." -ForegroundColor Green
 Write-Host "  Gateway      : http://localhost:8000/docs" -ForegroundColor DarkGray
 Write-Host "  Orchestrator : http://localhost:8001/docs" -ForegroundColor DarkGray
 Write-Host "  Search Agent : http://localhost:8002/docs" -ForegroundColor DarkGray
+Write-Host "  Search Agent : http://localhost:8003/docs" -ForegroundColor DarkGray

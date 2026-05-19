@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Shutdown
     logger.info("gateway.shutdown")
-    await redis_client.close()
+    await redis_client.aclose()
     await engine.dispose()
 
 def create_app() -> FastAPI:

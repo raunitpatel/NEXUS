@@ -148,6 +148,9 @@ nano db/.env
 | `POSTGRES_PASSWORD` | `.env` | Set something strong |
 | `REDIS_PASSWORD` | `.env` | Set something strong |
 | `ANTHROPIC_API_KEY` | `.env` | From https://console.anthropic.com |
+| `GEMINI_API_KEY` | `.env` | From https://aistudio.google.com/api-keys |
+| `OLLAMA-URL` | `.env` | Where ollama model is running |
+| `TAVILY_API_KEY` | `.env` | From https://app.tavily.com/home |
 | `JWT_SECRET` | `.env` | Any random string, 32+ chars |
 | `POSTGRES_PORT` | `.env` | Change to `5434` if port 5432 is taken |
 | `NGINX_HOST_PORT` | `.env` | Change to `8080` if port 80 is taken |
@@ -252,18 +255,33 @@ Builds and starts:
 
 **Windows**
 ```powershell
-.\scripts\run-all-services.ps1
+.\scripts\start-all-services.ps1
 ```
 
 **Linux**
 ```bash
-chmod +x scripts/run-all-services.sh
-./scripts/run-all-services.sh
+chmod +x scripts/start-all-services.sh
+./scripts/start-all-services.sh
 ```
 
 Gateway docs:
 ```text
 http://localhost:8000/docs
+```
+
+Orchestrator docs:
+```text
+http://localhost:8001/docs
+```
+
+Search Agent docs:
+```text
+http://localhost:8002/docs
+```
+
+Code Agent docs:
+```text
+http://localhost:8003/docs
 ```
 
 ---
@@ -305,6 +323,9 @@ What it runs:
 # Run tests
 .\scripts\test-all.ps1
 
-# Stop everything
-.\scripts\stop-all.ps1
+# Stop services
+.\scripts\stop-all-services.ps1
+
+# Stop infra
+.\scripts\stop-infra.ps1
 ```
