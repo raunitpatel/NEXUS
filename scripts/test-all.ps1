@@ -106,21 +106,43 @@ docker exec -it $searchAgentContainer `
 Write-Host ""
 Write-Host "Finding nexus-code-agent container..." -ForegroundColor Yellow
 
-$searchAgentContainer = docker ps `
+$codechAgentContainer = docker ps `
     --filter "name=nexus-code-agent" `
     --format "{{.ID}}"
 
-if (-not $searchAgentContainer) {
+if (-not $codeAgentContainer) {
     Write-Host "[ERROR] nexus-code-agent container is not running." -ForegroundColor Red
     exit 1
 }
 
-Write-Host "Code Agent container: $searchAgentContainer" -ForegroundColor Green
+Write-Host "Code Agent container: $codeAgentContainer" -ForegroundColor Green
 
 Write-Host ""
 Write-Host "Running code agent async tests inside container..." -ForegroundColor Yellow
 
-docker exec -it $searchAgentContainer `
+docker exec -it $codeAgentContainer `
     python -m pytest tests/ -v --asyncio-mode=auto
 
+# =========================================================
+# Memory Agent service tests
+# =========================================================
 
+Write-Host ""
+Write-Host "Finding nexus-memory-agent container..." -ForegroundColor Yellow
+
+$memoryAgentContainer = docker ps `
+    --filter "name=nexus-memory-agent" `
+    --format "{{.ID}}"
+
+if (-not $memoryAgentContainer) {
+    Write-Host "[ERROR] nexus-memory-agent container is not running." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Memory Agent container: $memoryAgentContainer" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Running code agent async tests inside container..." -ForegroundColor Yellow
+
+docker exec -it $memoryAgentContainer `
+    python -m pytest tests/ -v --asyncio-mode=auto

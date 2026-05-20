@@ -233,38 +233,58 @@ docker run -d `
     nexus-code-agent `
     uvicorn main:app --host 0.0.0.0 --port 8003 --reload
 
+# =========================================================
+# Memory Agent
+# =========================================================
+
+Write-Host ""
+Write-Host "Preparing nexus-memory-agent..." -ForegroundColor Yellow
+
+$memoryAgentImage = docker images -q nexus-memory-agent
+
+if (-not $memoryAgentImage) {
+    Write-Host "Building nexus-memory-agent image..." -ForegroundColor Yellow
+    docker build `
+        -f services/memory_agent/Dockerfile `
+        -t nexus-memory-agent .
+} else {
+    Write-Host "nexus-memory-agent image already exists. Skipping build." -ForegroundColor Green
+}
+
+Write-Host "Running nexus-memory-agent..." -ForegroundColor Yellow
+docker rm -f nexus-memory-agent 2>$null
+
+# -------------------------
+# Production
+# -------------------------
+
+# docker run -d `
+#     --name nexus-memory-agent `
+#     --network agent-net `
+#     --env-file services/memory_agent/.env `
+#     -p 8004:8004 `
+#     nexus-memory-agent
+
+# -------------------------
+# Development
+# -------------------------
+
+docker run -d `
+    --name nexus-memory-agent `
+    --network agent-net `
+    --env-file services/memory_agent/.env `
+    -p 8004:8004 `
+    -v "${PWD}/services/memory_agent:/app" `
+    -v "${PWD}/services/shared:/app/shared" `
+    nexus-memory-agent `
+    uvicorn main:app --host 0.0.0.0 --port 8004 --reload
+
+
 
 # =========================================================
 # Future Services
 # Uncomment when implemented
 # =========================================================
-
-
-# =========================================================
-# Memory Agent
-# =========================================================
-
-# $memoryAgentImage = docker images -q nexus-memory-agent
-#
-# if (-not $memoryAgentImage) {
-#
-#     docker build `
-#         -f services/memory_agent/Dockerfile `
-#         -t nexus-memory-agent .
-# }
-#
-# docker rm -f nexus-memory-agent 2>$null
-#
-# docker run -d `
-#     --name nexus-memory-agent `
-#     --network agent-net `
-#     --env-file services/memory_agent/.env `
-#     -p 8003:8003 `
-#     -v "${PWD}/services/memory_agent:/app" `
-#     -v "${PWD}/services/shared:/app/shared" `
-#     nexus-memory-agent `
-#     uvicorn main:app --host 0.0.0.0 --port 8003 --reload
-
 
 # =========================================================
 # Tool Agent
@@ -302,3 +322,4 @@ Write-Host "  Gateway      : http://localhost:8000/docs" -ForegroundColor DarkGr
 Write-Host "  Orchestrator : http://localhost:8001/docs" -ForegroundColor DarkGray
 Write-Host "  Search Agent : http://localhost:8002/docs" -ForegroundColor DarkGray
 Write-Host "  Search Agent : http://localhost:8003/docs" -ForegroundColor DarkGray
+Write-Host "  Memory Agent : http://localhost:8004/docs" -ForegroundColor DarkGray
