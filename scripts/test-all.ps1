@@ -146,3 +146,27 @@ Write-Host "Running code agent async tests inside container..." -ForegroundColor
 
 docker exec -it $memoryAgentContainer `
     python -m pytest tests/ -v --asyncio-mode=auto
+
+# =========================================================
+# Tool Agent service tests
+# =========================================================
+
+Write-Host ""
+Write-Host "Finding nexus-tool-agent container..." -ForegroundColor Yellow
+
+$toolAgentContainer = docker ps `
+    --filter "name=nexus-tool-agent" `
+    --format "{{.ID}}"
+
+if (-not $toolAgentContainer) {
+    Write-Host "[ERROR] nexus-tool-agent container is not running." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "Tool Agent container: $toolAgentContainer" -ForegroundColor Green
+
+Write-Host ""
+Write-Host "Running tool agent async tests inside container..." -ForegroundColor Yellow
+
+docker exec -it $toolAgentContainer `
+    python -m pytest tests/ -v --asyncio-mode=auto

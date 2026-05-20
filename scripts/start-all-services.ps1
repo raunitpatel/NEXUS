@@ -279,37 +279,50 @@ docker run -d `
     nexus-memory-agent `
     uvicorn main:app --host 0.0.0.0 --port 8004 --reload
 
-
-
-# =========================================================
-# Future Services
-# Uncomment when implemented
-# =========================================================
-
 # =========================================================
 # Tool Agent
 # =========================================================
 
-# $toolAgentImage = docker images -q nexus-tool-agent
-#
-# if (-not $toolAgentImage) {
-#
-#     docker build `
-#         -f services/tool_agent/Dockerfile `
-#         -t nexus-tool-agent .
-# }
-#
-# docker rm -f nexus-tool-agent 2>$null
-#
+Write-Host ""
+Write-Host "Preparing nexus-tool-agent..." -ForegroundColor Yellow
+
+$toolAgentImage = docker images -q nexus-tool-agent
+
+if (-not $toolAgentImage) {
+    Write-Host "Building nexus-tool-agent image..." -ForegroundColor Yellow
+    docker build `
+        -f services/tool_agent/Dockerfile `
+        -t nexus-tool-agent .
+} else {
+    Write-Host "nexus-tool-agent image already exists. Skipping build." -ForegroundColor Green
+}
+
+Write-Host "Running nexus-tool-agent..." -ForegroundColor Yellow
+docker rm -f nexus-tool-agent 2>$null
+
+# -------------------------
+# Production
+# -------------------------
+
 # docker run -d `
 #     --name nexus-tool-agent `
-#     --network agent-net `
+#     --network tool-net `
 #     --env-file services/tool_agent/.env `
-#     -p 8004:8004 `
-#     -v "${PWD}/services/tool_agent:/app" `
-#     -v "${PWD}/services/shared:/app/shared" `
-#     nexus-tool-agent `
-#     uvicorn main:app --host 0.0.0.0 --port 8004 --reload
+#     -p 8005:8005 `
+#     nexus-tool-agent
+
+# -------------------------
+# Development
+# -------------------------
+docker run -d `
+    --name nexus-tool-agent `
+    --network agent-net `
+    --env-file services/tool_agent/.env `
+    -p 8005:8005 `
+    -v "${PWD}/services/tool_agent:/app" `
+    -v "${PWD}/services/shared:/app/shared" `
+    nexus-tool-agent `
+    uvicorn main:app --host 0.0.0.0 --port 8005 --reload
 
 # =========================================================
 # Success Output
@@ -323,3 +336,6 @@ Write-Host "  Orchestrator : http://localhost:8001/docs" -ForegroundColor DarkGr
 Write-Host "  Search Agent : http://localhost:8002/docs" -ForegroundColor DarkGray
 Write-Host "  Search Agent : http://localhost:8003/docs" -ForegroundColor DarkGray
 Write-Host "  Memory Agent : http://localhost:8004/docs" -ForegroundColor DarkGray
+Write-Host "  Tool Agent   : http://localhost:8005/docs" -ForegroundColor DarkGray
+
+
