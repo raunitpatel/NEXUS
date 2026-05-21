@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_telemetry(
         service_name=settings.service_name,
         environment=settings.environment,
+        app=app,
     )
     configure_metrics()
 

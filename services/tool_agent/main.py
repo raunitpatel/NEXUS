@@ -31,7 +31,7 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Initialise DB engine and Kafka producer at startup; close on shutdown."""
     configure_logging(level=settings.log_level)
-    configure_telemetry(service_name=settings.service_name, environment=settings.environment)
+    configure_telemetry(service_name=settings.service_name, environment=settings.environment, app=app,)
     configure_metrics()
 
     engine: AsyncEngine = create_async_engine(

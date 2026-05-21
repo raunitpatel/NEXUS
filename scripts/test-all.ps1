@@ -20,7 +20,15 @@ python -m pytest tests/integration/test_infra.py -v
 Write-Host ""
 Write-Host "Running database schema tests..." -ForegroundColor Yellow
 
-python -m pytest db/tests/test_schema.py -v
+python -m pytest db/tests/ -v --asyncio-mode=auto
+
+# =========================================================
+# Shared services tests
+# =========================================================
+Write-Host ""
+Write-Host "Running shared services tests..." -ForegroundColor Yellow
+
+python -m pytest services/shared/tests/test_telemetry.py -v --asyncio-mode=auto
 
 # =========================================================
 # Gateway service tests

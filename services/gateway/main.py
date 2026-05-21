@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
 
     configure_logging(level=settings.log_level)
-    configure_telemetry(service_name=settings.service_name, environment=settings.environment)
+    configure_telemetry(service_name=settings.service_name, environment=settings.environment, app=app,)
 
     # Async SQLAlchemy engine (wraps asyncpg pool)
     engine: AsyncEngine = create_async_engine(
