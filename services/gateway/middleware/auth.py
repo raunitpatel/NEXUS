@@ -27,6 +27,7 @@ _EXEMPT_PREFIXES: tuple[str, ...] = (
     "/metrics",
     "/docs",
     "/openapi.json",
+    "/api/v1/sse/"
 )
 
 class AuthMiddleware(BaseHTTPMiddleware):

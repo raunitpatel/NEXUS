@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     rate_limit_requests_per_minute: int = 60
     rate_limit_burst: int = 10
 
+    # Internal service URLs
+    orchestrator_url: str = "http://nexus-orchestrator:8001"
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse comma-separated CORS origins into a list."""
