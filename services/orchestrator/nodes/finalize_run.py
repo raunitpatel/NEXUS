@@ -18,7 +18,8 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from state import OrchestratorState
-
+from nodes import _redis_client
+from sse_emitter import emit_event
 from shared.kafka_schemas import EventMessage
 
 logger = structlog.get_logger(__name__)
@@ -126,6 +127,24 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
         final_output=final_output,
         error=error,
     )
+    
+    try:
+        if _redis_client is not None:
+            event_type_sse = "run_complete" if terminal_status == "completed" else "run_error"
+            await emit_event(
+                run_id=run_id,
+                event_type=event_type_sse,
+                agent_name="orchestrator.finalize_run",
+                payload={
+                    "status": terminal_status,
+                    "output": final_output[:500] if final_output else None,
+                    "error": error,
+                    **metadata,
+                },
+                redis_client=_redis_client,
+            )
+    except Exception as _exc:
+        logger.warning("finalize_run.emit_failed", run_id=run_id, error=str(_exc))
 
     logger.info("node.finalize_run.complete", run_id=run_id, status=terminal_status)
     return {"status": terminal_status}

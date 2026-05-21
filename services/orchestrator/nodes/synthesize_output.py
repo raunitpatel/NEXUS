@@ -19,6 +19,8 @@ import structlog
 from llm_provider import LLMProviderError, get_llm_provider
 from nodes.decompose_query import OrchestratorError
 from state import OrchestratorState, TaskResult
+from nodes import _redis_client
+from sse_emitter import emit_event
  
 logger = structlog.get_logger(__name__)
  
@@ -94,7 +96,19 @@ async def synthesize_output(state: OrchestratorState) -> dict[str, Any]:
  
     if not final_output:
         raise OrchestratorError("LLM returned empty final_output during synthesis.")
- 
+    
+    try:
+        if _redis_client is not None:
+            await emit_event(
+                run_id=run_id,
+                event_type="orchestrator_synthesize",
+                agent_name="orchestrator.synthesize_output",
+                payload={"content": final_output[:500]},
+                redis_client=_redis_client,
+            )
+    except Exception as _exc:
+        logger.warning("synthesize_output.emit_failed", run_id=run_id, error=str(_exc))
+        
     logger.info(
         "synthesize_output.success",
         run_id=run_id,

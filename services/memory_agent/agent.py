@@ -251,6 +251,8 @@ class MemoryAgent:
             similarity_threshold=effective_threshold,
         )
 
+        results.sort(key=lambda r: r["similarity"], reverse=True)
+
         # Cache write
         try:
             await self._redis.set(

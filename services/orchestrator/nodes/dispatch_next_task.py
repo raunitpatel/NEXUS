@@ -18,6 +18,8 @@ import httpx
 import structlog
 
 from state import OrchestratorState, TaskPlan
+from nodes import _redis_client
+from sse_emitter import emit_event
 
 logger = structlog.get_logger(__name__)
 
@@ -170,5 +172,21 @@ async def dispatch_next_task(state: OrchestratorState) -> dict[str, Any]:
         agent_type=agent_type,
         elapsed_ms=elapsed_ms,
     )
+
+    try:
+        if _redis_client is not None:
+            await emit_event(
+                run_id=run_id,
+                event_type="orchestrator_dispatch",
+                agent_name="orchestrator.dispatch_next_task",
+                payload={
+                    "task_id": next_task["task_id"],
+                    "agent_type": agent_type,
+                    "agent_url": agent_url,
+                },
+                redis_client=_redis_client,
+            )
+    except Exception as _exc:
+        logger.warning("dispatch_next_task.emit_failed", run_id=run_id, error=str(_exc))
 
     return {"pending_task": pending_task_with_response}

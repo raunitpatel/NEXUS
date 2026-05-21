@@ -25,6 +25,7 @@ from shared.metrics import configure_metrics
 from shared.telemetry import configure_telemetry
 from state import OrchestratorState
 
+
 logger = structlog.get_logger(__name__)
 
 # Lifespan
@@ -71,6 +72,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         decode_responses=True,
     )
     app.state.redis = redis_client
+
+    from nodes import set_redis_client
+    set_redis_client(redis_client)
+    logger.info("orchestrator.redis_wired_to_nodes")
 
     logger.info("orchestrator.resources_ready")
     yield
@@ -126,6 +131,10 @@ def create_app() -> FastAPI:
     )
 
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
+
+    from routers.sse import router as sse_router
+
+    app.include_router(sse_router, tags=["sse"])
 
     @app.get("/healthz", tags=["health"])
     async def health_check() -> dict[str, str]:

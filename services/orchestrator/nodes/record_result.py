@@ -18,6 +18,8 @@ from state import OrchestratorState
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, AsyncSession
+from nodes import _redis_client
+from sse_emitter import emit_event
 
 logger = structlog.get_logger(__name__)
 
@@ -141,6 +143,23 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
 
     completed_tasks = list(state.get("completed_tasks", []))
     completed_tasks.append(task_result)
+
+    try:
+        if _redis_client is not None:
+            await emit_event(
+                run_id=run_id,
+                event_type="tool_result",
+                agent_name="orchestrator.record_result",
+                payload={
+                    "task_id": task_id,
+                    "agent_type": task_result.get("agent_type"),
+                    "status": db_status,
+                    "duration_ms": task_result.get("duration_ms", 0),
+                },
+                redis_client=_redis_client,
+            )
+    except Exception as _exc:
+        logger.warning("record_result.emit_failed", run_id=run_id, error=str(_exc))
 
     logger.info(
         "node.record_result.appended",

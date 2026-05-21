@@ -20,6 +20,8 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 from llm_provider import LLMProviderError, get_llm_provider
 from state import AgentType, OrchestratorState, TaskPlan
+from nodes import _redis_client
+from sse_emitter import emit_event
  
 logger = structlog.get_logger(__name__)
  
@@ -126,6 +128,23 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
     query = state["query"]
  
     logger.info("decompose_query.start", run_id=run_id, query=query[:100])
+
+    # Emit run_start immediately so the SSE client knows the run is live
+    try:
+        from config import settings as _settings
+        import redis.asyncio as _aioredis
+        # Note: nodes don't have direct access to app.state — we use a module-level
+        # redis client reference set by main.py lifespan (same pattern as _db_engine)
+        if _redis_client is not None:
+            await emit_event(
+                run_id=run_id,
+                event_type="run_start",
+                agent_name="orchestrator.decompose_query",
+                payload={"query": query[:200]},
+                redis_client=_redis_client,
+            )
+    except Exception as _exc:
+        logger.warning("decompose_query.emit_run_start_failed", run_id=run_id, error=str(_exc))
  
     provider = get_llm_provider()
  
@@ -202,7 +221,21 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
             + ", ".join(t["agent_type"] for t in plan)
         ),
     )
- 
+    try:
+        if _redis_client is not None:
+            await emit_event(
+                run_id=run_id,
+                event_type="thought",
+                agent_name="orchestrator.decompose_query",
+                payload={
+                    "content": f"Decomposed into {len(plan)} task(s): "
+                            + ", ".join(t["agent_type"] for t in plan),
+                    "task_count": len(plan),
+                },
+                redis_client=_redis_client,
+            )
+    except Exception as _exc:
+        logger.warning("decompose_query.emit_thought_failed", run_id=run_id, error=str(_exc))
     # FIX C2: return key is "task_plan" not "plan"
     # FIX C3: token keys are "input_tokens"/"output_tokens" not "total_prompt_tokens"
     return {

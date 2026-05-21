@@ -106,7 +106,7 @@ docker exec -it $searchAgentContainer `
 Write-Host ""
 Write-Host "Finding nexus-code-agent container..." -ForegroundColor Yellow
 
-$codechAgentContainer = docker ps `
+$codeAgentContainer = docker ps `
     --filter "name=nexus-code-agent" `
     --format "{{.ID}}"
 

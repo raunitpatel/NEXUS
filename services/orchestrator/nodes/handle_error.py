@@ -11,6 +11,8 @@ import structlog
 
 from state import OrchestratorState
 from sqlalchemy.ext.asyncio import AsyncEngine
+from nodes import _redis_client
+from sse_emitter import emit_event
 
 _db_engine: AsyncEngine | None = None
 def set_db_engine(engine: AsyncEngine) -> None:
@@ -71,7 +73,19 @@ async def handle_error(state: OrchestratorState) -> OrchestratorState:
                 await session.commit()
         except Exception as exc:
             logger.error("node.handle_error.db_error", run_id=run_id, error=str(exc))
-
+    
+    try:
+        if _redis_client is not None:
+            await emit_event(
+                run_id=run_id,
+                event_type="run_error",
+                agent_name="orchestrator.handle_error",
+                payload={"error": error_msg, "retry_count": current_retry + 1},
+                redis_client=_redis_client,
+            )
+    except Exception as _exc:
+        logger.warning("handle_error.emit_failed", run_id=run_id, error=str(_exc))
+        
     return {
         **state,
         "retry_count": current_retry + 1,

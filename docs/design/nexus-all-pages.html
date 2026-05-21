@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NEXUS — Full App (Orchestrator-first)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { font-family:'Inter',system-ui,sans-serif; box-sizing:border-box; margin:0; padding:0; }
+    body { background:#E8E7E3; }
+
+    /* ── Animations ── */
+    @keyframes pulse-dot  { 0%,100%{opacity:1;transform:scale(1);} 50%{opacity:.55;transform:scale(1.4);} }
+    @keyframes blink      { 0%,100%{opacity:1;} 50%{opacity:0;} }
+    @keyframes prog-pulse { 0%,100%{opacity:1;} 50%{opacity:.6;} }
+    @keyframes spin       { to{transform:rotate(360deg);} }
+    @keyframes shimmer    { 0%{background-position:-400px 0;} 100%{background-position:400px 0;} }
+    @keyframes slide-in   { from{opacity:0;transform:translateY(7px);} to{opacity:1;transform:translateY(0);} }
+
+    .pulse-dot  { animation:pulse-dot  1.5s ease-in-out infinite; }
+    .blink      { animation:blink      1s   step-end   infinite; }
+    .prog-pulse { animation:prog-pulse 2s   ease-in-out infinite; }
+    .shimmer-el { background:linear-gradient(90deg,#f0efeb 25%,#e4e2dc 50%,#f0efeb 75%); background-size:400px 100%; animation:shimmer 1.4s ease-in-out infinite; border-radius:4px; }
+    .spinner    { width:14px;height:14px;border:2px solid rgba(255,255,255,.35);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0; }
+    .slide-in   { animation:slide-in .22s ease-out; }
+
+    /* ── Shell layout ── */
+    .shell  { display:flex; height:100%; }
+    .sidebar{ width:220px;background:#1C1C1A;display:flex;flex-direction:column;flex-shrink:0; }
+
+    /* Wordmark */
+    .sb-wm  { padding:18px 16px 14px;display:flex;align-items:center;gap:9px;border-bottom:1px solid rgba(255,255,255,.06); }
+    .sb-ic  { width:24px;height:24px;background:#534AB7;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+    .wm-tx  { font-size:14px;font-weight:600;color:#fff;letter-spacing:.08em; }
+
+    /* Nav */
+    .sb-nav { flex:1;padding:8px 0;display:flex;flex-direction:column;gap:1px; }
+    .ni     { display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13.5px;font-weight:500;color:#888780;cursor:pointer;border-left:3px solid transparent;text-decoration:none; }
+    .ni:hover { background:rgba(255,255,255,.05);color:#fff; }
+    .ni.active{ border-left-color:#534AB7;color:#534AB7;background:rgba(83,74,183,.08); }
+    .ni svg { width:16px;height:16px;flex-shrink:0; }
+
+    /* Nav section divider */
+    .sb-divider { height:1px;background:rgba(255,255,255,.06);margin:6px 0; }
+    .sb-section-label { font-size:10px;font-weight:700;color:rgba(255,255,255,.25);text-transform:uppercase;letter-spacing:.1em;padding:6px 16px 4px; }
+
+    /* Footer */
+    .sb-ft  { padding:14px 16px;border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:9px; }
+    .ua     { width:28px;height:28px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:white;flex-shrink:0; }
+    .un     { font-size:13px;font-weight:500;color:#C8C7C3;flex:1; }
+    .logout-btn { color:#888780;cursor:pointer;display:flex;align-items:center; }
+    .logout-btn:hover { color:#fff; }
+
+    /* Main wrapper */
+    .main-w { display:flex;flex-direction:column;flex:1;min-width:0;overflow:hidden; }
+    .topbar { height:52px;background:#fff;border-bottom:1px solid rgba(0,0,0,.08);display:flex;align-items:center;padding:0 20px;gap:12px;flex-shrink:0; }
+    .tb-ti  { font-size:15px;font-weight:500;color:#1C1C1A;flex:1; }
+    .live-i { display:flex;align-items:center;gap:7px;font-size:12.5px;color:#1D9E75;font-weight:500;white-space:nowrap; }
+    .ld     { width:7px;height:7px;background:#1D9E75;border-radius:50%;flex-shrink:0; }
+    .tb-div { width:1px;height:20px;background:rgba(0,0,0,.1);flex-shrink:0; }
+    .tb-ib  { width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;color:#888780;flex-shrink:0; }
+    .tb-ib:hover { background:#F5F4F0; }
+    .tb-av  { width:28px;height:28px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:white;flex-shrink:0; }
+    .content{ flex:1;background:#F5F4F0;overflow-y:auto;padding:24px; }
+
+    /* ── Primitives ── */
+    .card   { background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.07); }
+    .badge  { display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:4px;font-size:11.5px;font-weight:600;white-space:nowrap; }
+    .b-run  { background:#E8F8F2;color:#1D9E75; }
+    .b-done { background:#E8F8F2;color:#1D9E75; }
+    .b-fail { background:#FDECEA;color:#E24B4A; }
+    .b-q    { background:#FEF3E2;color:#BA7517; }
+    .chip   { display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:11px;font-weight:600;white-space:nowrap; }
+    .c-s{background:#E6F1FB;color:#0C447C;} .c-c{background:#FAEEDA;color:#633806;}
+    .c-m{background:#EEEDFE;color:#3C3489;} .c-t{background:#E1F5EE;color:#085041;}
+    .cd { width:5px;height:5px;border-radius:50%; }
+    .c-s .cd{background:#378ADD;} .c-c .cd{background:#EF9F27;} .c-m .cd{background:#7F77DD;} .c-t .cd{background:#1D9E75;}
+
+    /* ── Query / prompt box ── */
+    .qbox   { background:#fff;border-radius:10px;border:1.5px solid rgba(83,74,183,.22);box-shadow:0 2px 14px rgba(83,74,183,.08);padding:20px 22px;margin-bottom:16px; }
+    .qb-lbl { font-size:11px;font-weight:700;color:#888780;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px; }
+    .qb-ta  { width:100%;border:1px solid rgba(0,0,0,.12);border-radius:7px;padding:12px 14px;font-size:14px;color:#1C1C1A;font-family:inherit;outline:none;resize:none;line-height:1.65; }
+    .qb-ta:focus { border-color:#534AB7;box-shadow:0 0 0 3px rgba(83,74,183,.12); }
+    .qb-ta::placeholder { color:#B0AFA9; }
+    .qb-footer { display:flex;align-items:flex-end;justify-content:space-between;margin-top:14px;gap:16px; }
+
+    /* Agent toggles */
+    .agent-toggles { display:flex;flex-direction:column;gap:6px; }
+    .at-label { font-size:11px;font-weight:600;color:#888780;text-transform:uppercase;letter-spacing:.05em; }
+    .at-row   { display:flex;gap:7px;flex-wrap:wrap; }
+    .at-btn   { display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:5px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid rgba(0,0,0,.1);background:transparent;color:#888780;font-family:inherit;transition:all .12s; }
+    .at-btn.on-s  { border-color:#378ADD;color:#0C447C;background:#E6F1FB; }
+    .at-btn.on-c  { border-color:#EF9F27;color:#633806;background:#FAEEDA; }
+    .at-btn.on-m  { border-color:#7F77DD;color:#3C3489;background:#EEEDFE; }
+    .at-btn.on-t  { border-color:#1D9E75;color:#085041;background:#E1F5EE; }
+    .at-dot { width:6px;height:6px;border-radius:50%; }
+
+    /* Submit button */
+    .btn-run{ background:#534AB7;color:white;border:none;padding:10px 22px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-family:inherit;white-space:nowrap; }
+    .btn-run:hover { background:#4840A0; }
+    .btn-run.loading { opacity:.82;cursor:wait; }
+
+    /* ── Thought trace ── */
+    .ev     { border-left:3px solid transparent;padding:12px 16px;background:#fff;border-bottom:1px solid rgba(0,0,0,.05); }
+    .ev:last-child { border-bottom:none; }
+    .ev-t   { border-left-color:#534AB7; }
+    .ev-tc  { border-left-color:#BA7517; }
+    .ev-tr  { border-left-color:#1D9E75; }
+    .ev-f   { border-left-color:#1D9E75;background:#F8FDF9; }
+    .ev-hdr { display:flex;align-items:center;justify-content:space-between;margin-bottom:7px; }
+    .evb    { display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:3px;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase; }
+    .evb-t  { background:#EEEDFE;color:#3C3489; }
+    .evb-tc { background:#FEF3E2;color:#884A05; }
+    .evb-tr { background:#E1F5EE;color:#085041; }
+    .evb-f  { background:#D4F3E6;color:#0A5E3A; }
+    .ev-ts  { font-size:11px;color:#B0AFA9;font-family:monospace; }
+    .ev-body{ font-size:13px;color:#2C2C2A;line-height:1.6; }
+    .ev-i   { font-style:italic;color:#4A4A48; }
+    .ev-code{ background:#F5F4F0;border:1px solid rgba(0,0,0,.07);border-radius:5px;padding:7px 10px;font-family:monospace;font-size:11.5px;color:#1C1C1A;margin-top:5px;overflow-x:auto; }
+    .ev-prev{ background:#F5F4F0;border:1px solid rgba(0,0,0,.07);border-radius:5px;padding:6px 10px;font-family:monospace;font-size:11px;color:#888780;margin-top:5px;max-height:46px;overflow:hidden; }
+
+    /* ── Final answer ── */
+    .ans-box { background:#fff;border-radius:8px;border:1.5px solid rgba(29,158,117,.2);padding:20px 22px;margin-bottom:16px; }
+    .ans-lbl { display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:#1D9E75;text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px; }
+    .ans-body{ font-size:14px;color:#1C1C1A;line-height:1.8; }
+    .ans-actions { display:flex;gap:9px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(0,0,0,.06); }
+    .ans-btn { display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border-radius:6px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:inherit;border:1px solid rgba(0,0,0,.12);background:none;color:#888780; }
+    .ans-btn:hover { background:#F5F4F0;color:#1C1C1A; }
+    .ans-btn-p { background:#534AB7;color:white;border-color:#534AB7; }
+    .ans-btn-p:hover { background:#4840A0; }
+
+    /* ── Summary panel ── */
+    .sum-panel { position:sticky;top:0; }
+    .sum-sec  { padding:13px 16px;border-bottom:1px solid rgba(0,0,0,.06); }
+    .sum-sec:last-child { border-bottom:none; }
+    .sum-ti   { font-size:11px;font-weight:700;color:#888780;text-transform:uppercase;letter-spacing:.06em;margin-bottom:9px; }
+    .sum-row  { display:flex;justify-content:space-between;margin-bottom:5px; }
+    .sum-row:last-child { margin-bottom:0; }
+    .sum-k    { font-size:12.5px;color:#888780; }
+    .sum-v    { font-size:12.5px;font-weight:600;color:#1C1C1A; }
+
+    /* ── Metric card ── */
+    .mc      { background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.07);padding:16px 18px; }
+    .mc-lbl  { font-size:12px;color:#888780;font-weight:500;margin-bottom:8px; }
+    .mc-num  { font-size:28px;font-weight:500;color:#1C1C1A;line-height:1;margin-bottom:8px; }
+    .mc-trend{ font-size:11.5px;font-weight:500;display:flex;align-items:center;gap:4px; }
+
+    /* ── Progress ── */
+    .prog-track { height:3px;background:#F0EFE9;border-radius:2px;overflow:hidden; }
+    .prog-fill  { height:100%;background:#534AB7;border-radius:2px; }
+
+    /* Table */
+    table { width:100%;border-collapse:collapse; }
+    th { font-size:11.5px;font-weight:600;color:#888780;text-transform:uppercase;letter-spacing:.05em;padding:10px 14px;text-align:left;border-bottom:1px solid rgba(0,0,0,.07); }
+    td { font-size:13px;color:#1C1C1A;padding:11px 14px;border-bottom:1px solid rgba(0,0,0,.05);vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    tr.row-fail { background:rgba(226,75,74,.03); }
+    .run-id { font-family:monospace;font-size:12px;color:#534AB7; }
+    .qcell  { max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+    .vl     { color:#534AB7;font-size:12.5px;font-weight:500;text-decoration:none; }
+    .vl:hover { text-decoration:underline; }
+
+    /* Back link */
+    .back-link { display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:#888780;font-weight:500;text-decoration:none;margin-bottom:10px; }
+    .back-link:hover { color:#534AB7; }
+
+    /* Two col */
+    .two-col { display:grid;grid-template-columns:1fr 288px;gap:16px;align-items:start; }
+
+    /* ── Demo wrapper ── */
+    .demo-block { padding:32px 32px 0; background:#E8E7E3; }
+    .demo-tag   { font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#888780;background:white;border:1px solid rgba(0,0,0,.1);padding:4px 10px;border-radius:4px;margin-bottom:12px;display:inline-block; }
+    .demo-wrap  { padding:0 32px; background:#E8E7E3; }
+
+    /* ── Sidebar snippet helper ── */
+    /* Each page snippet reuses these nav items */
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+  SIDEBAR ANATOMY — shows the new nav structure
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block"><div class="demo-tag">Updated navigation — Orchestrator is the primary action item</div></div>
+<div class="demo-wrap" style="padding-bottom:32px;">
+  <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+
+    <!-- Sidebar annotated -->
+    <div style="width:220px;background:#1C1C1A;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.2);">
+      <div class="sb-wm">
+        <div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div>
+        <span class="wm-tx">NEXUS</span>
+      </div>
+      <nav class="sb-nav">
+
+        <!-- PRIMARY ACTION — always first, always visible -->
+        <a class="ni active" href="#" style="background:rgba(83,74,183,.12);border-left-color:#534AB7;color:#534AB7;">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>
+          Orchestrator
+        </a>
+
+        <div class="sb-divider"></div>
+        <div class="sb-section-label">My workspace</div>
+
+        <a class="ni" href="#">
+          <svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/></svg>
+          Dashboard
+        </a>
+        <a class="ni" href="#">
+          <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          Runs
+        </a>
+        <a class="ni" href="#">
+          <svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="10.5" width="8" height="1.5" rx=".75" fill="currentColor"/></svg>
+          History
+        </a>
+        <a class="ni" href="#">
+          <svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6c0 2.5 2.5 5 5.5 5s5.5-2.5 5.5-5" stroke="currentColor" stroke-width="1.5"/></svg>
+          Memory
+        </a>
+        <a class="ni" href="#">
+          <svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Observability
+        </a>
+      </nav>
+      <div class="sb-ft">
+        <div class="ua">AK</div>
+        <span class="un">Aryan K.</span>
+        <div class="logout-btn"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><path d="M10 10l4-3-4-3v2H5v2h5v2z" fill="currentColor"/><path d="M8 13H3a1 1 0 01-1-1V3a1 1 0 011-1h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+      </div>
+    </div>
+
+    <!-- Annotation callouts -->
+    <div style="display:flex;flex-direction:column;gap:14px;padding-top:12px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="width:24px;height:24px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:12px;font-weight:700;flex-shrink:0;">1</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#1C1C1A;">Orchestrator — Primary action</div>
+          <div style="font-size:12.5px;color:#888780;line-height:1.55;max-width:340px;">Where users type their query and start a run. This is the entry point to everything. Always first in the nav, always prominent. Think of it like the "compose" button in Gmail.</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="width:24px;height:24px;background:#F0EFE9;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#888780;font-size:12px;font-weight:700;flex-shrink:0;">2</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#1C1C1A;">My workspace — Personal data only</div>
+          <div style="font-size:12.5px;color:#888780;line-height:1.55;max-width:340px;">Dashboard, Runs, History, Memory, Observability all show data filtered to the authenticated user's <code style="font-size:11px;background:#F0EFE9;padding:1px 5px;border-radius:3px;">user_id</code>. Aryan only ever sees Aryan's runs.</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        <div style="width:24px;height:24px;background:#F0EFE9;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#888780;font-size:12px;font-weight:700;flex-shrink:0;">3</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#1C1C1A;">Divider separates action from analytics</div>
+          <div style="font-size:12.5px;color:#888780;line-height:1.55;max-width:340px;">The thin divider and "My workspace" label make it visually clear that Orchestrator is a <em>do something</em> page, while the items below are <em>review what happened</em> pages.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE 1 — ORCHESTRATOR (active, with query filled)
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:40px;"><div class="demo-tag">Page 1 — Orchestrator (user's query entry point)</div></div>
+<div class="demo-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:720px;">
+  <div class="sidebar">
+    <div class="sb-wm"><div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div><span class="wm-tx">NEXUS</span></div>
+    <nav class="sb-nav">
+      <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>Orchestrator</a>
+      <div class="sb-divider"></div>
+      <div class="sb-section-label">My workspace</div>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/></svg>Dashboard</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Runs</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="10.5" width="8" height="1.5" rx=".75" fill="currentColor"/></svg>History</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6c0 2.5 2.5 5 5.5 5s5.5-2.5 5.5-5" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Observability</a>
+    </nav>
+    <div class="sb-ft"><div class="ua">AK</div><span class="un">Aryan K.</span><div class="logout-btn"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><path d="M10 10l4-3-4-3v2H5v2h5v2z" fill="currentColor"/><path d="M8 13H3a1 1 0 01-1-1V3a1 1 0 011-1h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div></div>
+  </div>
+  <div class="main-w">
+    <div class="topbar">
+      <span class="tb-ti">Orchestrator</span>
+      <div class="tb-ib"><svg viewBox="0 0 16 16" fill="none" width="16" height="16"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v1.5M8 13.5V15M15 8h-1.5M2.5 8H1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div>
+      <div class="tb-av">AK</div>
+    </div>
+    <div class="content">
+      <!-- Greeting -->
+      <div style="margin-bottom:20px;">
+        <div style="font-size:20px;font-weight:600;color:#1C1C1A;margin-bottom:4px;">Good afternoon, Aryan 👋</div>
+        <div style="font-size:13.5px;color:#888780;">What do you want to research, build, or explore today?</div>
+      </div>
+
+      <!-- Query box — the hero -->
+      <div class="qbox">
+        <div class="qb-lbl">Your query</div>
+        <textarea class="qb-ta" rows="4" style="border-color:#534AB7;box-shadow:0 0 0 3px rgba(83,74,183,.12);">Research the latest breakthroughs in diffusion models for video generation, summarise the top 3 papers, and write a Python snippet to load CogVideoX using the diffusers library.</textarea>
+        <div class="qb-footer">
+          <div class="agent-toggles">
+            <div class="at-label">Agents to use</div>
+            <div class="at-row">
+              <button class="at-btn on-s"><div class="at-dot" style="background:#378ADD;"></div>Search</button>
+              <button class="at-btn on-c"><div class="at-dot" style="background:#EF9F27;"></div>Code</button>
+              <button class="at-btn"><div class="at-dot" style="background:#7F77DD;"></div>Memory</button>
+              <button class="at-btn"><div class="at-dot" style="background:#1D9E75;"></div>Tool</button>
+            </div>
+          </div>
+          <button class="btn-run">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><polygon points="2,1 11,6 2,11" fill="white"/></svg>
+            Start run
+          </button>
+        </div>
+      </div>
+
+      <!-- Keyboard hint -->
+      <div style="font-size:12px;color:#B0AFA9;margin-bottom:24px;display:flex;align-items:center;gap:16px;">
+        <span><kbd style="background:#F0EFE9;border:1px solid rgba(0,0,0,.12);padding:2px 6px;border-radius:4px;font-size:11px;">Ctrl</kbd> + <kbd style="background:#F0EFE9;border:1px solid rgba(0,0,0,.12);padding:2px 6px;border-radius:4px;font-size:11px;">Enter</kbd> to submit</span>
+        <span style="margin-left:auto;">Tip: enable Memory agent to recall context from your past runs</span>
+      </div>
+
+      <!-- Recent queries as suggestions -->
+      <div style="margin-bottom:6px;">
+        <div style="font-size:11px;font-weight:700;color:#888780;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Your recent queries</div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:border-color .12s;" onmouseover="this.style.borderColor='rgba(83,74,183,.2)'" onmouseout="this.style.borderColor='rgba(0,0,0,.07)'">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="color:#B0AFA9;flex-shrink:0;"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span style="font-size:13px;color:#2C2C2A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Summarize the top 5 AI research labs by publication count in 2024</span>
+            <span style="font-size:11.5px;color:#B0AFA9;flex-shrink:0;">2 min ago</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="color:#B0AFA9;flex-shrink:0;"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;" onmouseover="this.style.borderColor='rgba(83,74,183,.2)'" onmouseout="this.style.borderColor='rgba(0,0,0,.07)'">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="color:#B0AFA9;flex-shrink:0;"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span style="font-size:13px;color:#2C2C2A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Generate a typed REST API client in Python for the GitHub API</span>
+            <span style="font-size:11.5px;color:#B0AFA9;flex-shrink:0;">Today 14:32</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="color:#B0AFA9;flex-shrink:0;"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <div style="background:#fff;border:1px solid rgba(0,0,0,.07);border-radius:7px;padding:10px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;" onmouseover="this.style.borderColor='rgba(83,74,183,.2)'" onmouseout="this.style.borderColor='rgba(0,0,0,.07)'">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="color:#B0AFA9;flex-shrink:0;"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span style="font-size:13px;color:#2C2C2A;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">What is the current weather in Tokyo and should I bring an umbrella next week?</span>
+            <span style="font-size:11.5px;color:#B0AFA9;flex-shrink:0;">Yesterday 09:15</span>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style="color:#B0AFA9;flex-shrink:0;"><path d="M2 6h8M7 3l3 3-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE 2 — DASHBOARD (personal stats — Aryan's data only)
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:40px;"><div class="demo-tag">Page 2 — Dashboard (Aryan's personal metrics — only his runs)</div></div>
+<div class="demo-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:720px;">
+  <div class="sidebar">
+    <div class="sb-wm"><div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div><span class="wm-tx">NEXUS</span></div>
+    <nav class="sb-nav">
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>Orchestrator</a>
+      <div class="sb-divider"></div>
+      <div class="sb-section-label">My workspace</div>
+      <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/></svg>Dashboard</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Runs</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="10.5" width="8" height="1.5" rx=".75" fill="currentColor"/></svg>History</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6c0 2.5 2.5 5 5.5 5s5.5-2.5 5.5-5" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Observability</a>
+    </nav>
+    <div class="sb-ft"><div class="ua">AK</div><span class="un">Aryan K.</span><div class="logout-btn"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><path d="M10 10l4-3-4-3v2H5v2h5v2z" fill="currentColor"/><path d="M8 13H3a1 1 0 01-1-1V3a1 1 0 011-1h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div></div>
+  </div>
+  <div class="main-w">
+    <div class="topbar">
+      <span class="tb-ti">Dashboard</span>
+      <!-- Ownership badge -->
+      <div style="display:flex;align-items:center;gap:6px;background:#F0EFE9;border:1px solid rgba(0,0,0,.08);padding:3px 10px;border-radius:5px;font-size:12px;color:#888780;font-weight:500;">
+        <div style="width:16px;height:16px;background:#534AB7;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:white;">AK</div>
+        Aryan's workspace
+      </div>
+      <div class="live-i" style="margin-left:4px;"><div class="ld pulse-dot"></div>1 run active</div>
+      <div class="tb-div"></div>
+      <div class="tb-av">AK</div>
+    </div>
+    <div class="content">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+        <div>
+          <div style="font-size:16px;font-weight:600;color:#1C1C1A;">Your activity overview</div>
+          <div style="font-size:12.5px;color:#888780;margin-top:2px;">All data shown is yours only — filtered by your account</div>
+        </div>
+        <a href="#" style="display:inline-flex;align-items:center;gap:6px;background:#534AB7;color:white;border:none;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:500;text-decoration:none;">
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><polygon points="2,1 10,5.5 2,10" fill="white"/></svg>
+          New run
+        </a>
+      </div>
+
+      <!-- Metric cards — Aryan's personal numbers -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;">
+        <div class="mc">
+          <div class="mc-lbl">My total runs</div>
+          <div class="mc-num">47</div>
+          <div class="mc-trend" style="color:#1D9E75;"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>↑ 8 this week</div>
+        </div>
+        <div class="mc">
+          <div class="mc-lbl">Running now</div>
+          <div class="mc-num" style="color:#1D9E75;display:flex;align-items:center;gap:9px;">1<div class="ld pulse-dot"></div></div>
+          <div style="font-size:11.5px;color:#888780;">1 agent active</div>
+        </div>
+        <div class="mc">
+          <div class="mc-lbl">My success rate</div>
+          <div class="mc-num">91.5%</div>
+          <div class="mc-trend" style="color:#E24B4A;"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2v6M2 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>↓ 2.1% vs last week</div>
+        </div>
+        <div class="mc">
+          <div class="mc-lbl">Tokens used</div>
+          <div class="mc-num" style="font-size:22px;">184k</div>
+          <div style="font-size:11.5px;color:#888780;">this week</div>
+        </div>
+      </div>
+
+      <!-- Active run -->
+      <div class="card" style="margin-bottom:18px;">
+        <div style="padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px;">
+          <div class="ld pulse-dot"></div>
+          <span style="font-size:13px;font-weight:600;color:#1C1C1A;">Running now</span>
+        </div>
+        <div style="padding:13px 18px;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px;">
+            <div>
+              <span class="run-id">run_f7a3b9</span>
+              <div style="font-size:13px;color:#2C2C2A;margin-top:3px;max-width:500px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Research latest breakthroughs in diffusion models for video generation…</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+              <span class="badge b-run"><div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;" class="pulse-dot"></div>Running</span>
+              <a href="#" style="background:transparent;color:#534AB7;border:1px solid rgba(83,74,183,.35);padding:5px 10px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;text-decoration:none;">Watch live →</a>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="chip c-s"><div class="cd"></div>Search</span>
+              <span class="chip c-c"><div class="cd"></div>Code</span>
+              <span style="font-size:11.5px;color:#888780;margin-left:4px;">running for 18s</span>
+            </div>
+            <div class="prog-track" style="width:120px;"><div class="prog-fill prog-pulse" style="width:55%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent runs table — user's own -->
+      <div class="card">
+        <div style="padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:13px;font-weight:600;color:#1C1C1A;">My recent runs</span>
+          <a href="#" class="vl">View all history →</a>
+        </div>
+        <table>
+          <thead><tr><th>Run ID</th><th>Query</th><th>Agents</th><th>Status</th><th>Duration</th><th>Started</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><span class="run-id">run_9d12ef</span></td><td class="qcell">Summarize top 5 AI research labs by publication count</td><td><span class="chip c-s"><div class="cd"></div>Search</span></td><td><span class="badge b-done">Completed</span></td><td style="font-size:12.5px;color:#888780;">3.2s</td><td style="font-size:12.5px;color:#888780;">2 min ago</td><td><a href="#" class="vl">View →</a></td></tr>
+            <tr><td><span class="run-id">run_4a7bc1</span></td><td class="qcell">Generate a typed REST API client in Python for GitHub</td><td><span class="chip c-c"><div class="cd"></div>Code</span></td><td><span class="badge b-done">Completed</span></td><td style="font-size:12.5px;color:#888780;">12.7s</td><td style="font-size:12.5px;color:#888780;">Today 14:32</td><td><a href="#" class="vl">View →</a></td></tr>
+            <tr class="row-fail"><td><span class="run-id">run_2e88dd</span></td><td class="qcell">What did I search last week about Kubernetes networking?</td><td><span class="chip c-m"><div class="cd"></div>Memory</span></td><td><span class="badge b-fail">Failed</span></td><td style="font-size:12.5px;color:#888780;">847ms</td><td style="font-size:12.5px;color:#888780;">Today 13:58</td><td><a href="#" class="vl">View →</a></td></tr>
+            <tr><td><span class="run-id">run_77f1a3</span></td><td class="qcell">Compound interest for $50,000 at 7.3% over 20 years</td><td><span class="chip c-t"><div class="cd"></div>Tool</span></td><td><span class="badge b-done">Completed</span></td><td style="font-size:12.5px;color:#888780;">1.1s</td><td style="font-size:12.5px;color:#888780;">Today 13:44</td><td><a href="#" class="vl">View →</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE 3 — RUN DETAIL (live watch — agents working)
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:40px;"><div class="demo-tag">Page 3 — Runs (live thought trace — after starting from Orchestrator)</div></div>
+<div class="demo-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:860px;">
+  <div class="sidebar">
+    <div class="sb-wm"><div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div><span class="wm-tx">NEXUS</span></div>
+    <nav class="sb-nav">
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>Orchestrator</a>
+      <div class="sb-divider"></div>
+      <div class="sb-section-label">My workspace</div>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".5"/></svg>Dashboard</a>
+      <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Runs</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="10.5" width="8" height="1.5" rx=".75" fill="currentColor"/></svg>History</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6c0 2.5 2.5 5 5.5 5s5.5-2.5 5.5-5" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Observability</a>
+    </nav>
+    <div class="sb-ft"><div class="ua">AK</div><span class="un">Aryan K.</span><div class="logout-btn"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><path d="M10 10l4-3-4-3v2H5v2h5v2z" fill="currentColor"/><path d="M8 13H3a1 1 0 01-1-1V3a1 1 0 011-1h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div></div>
+  </div>
+  <div class="main-w">
+    <div class="topbar">
+      <span class="tb-ti">Run detail</span>
+      <div class="live-i"><div class="ld pulse-dot"></div>Agents working…</div>
+      <div class="tb-div"></div><div class="tb-av">AK</div>
+    </div>
+    <div class="content">
+      <a href="#" class="back-link"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>My dashboard</a>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">
+        <div>
+          <span class="run-id" style="font-size:13px;">run_f7a3b9</span>
+          <div style="font-size:15px;font-weight:500;color:#1C1C1A;margin:4px 0 10px;line-height:1.45;max-width:580px;">Research latest breakthroughs in diffusion models for video generation, summarise top 3 papers, and write a Python snippet to load CogVideoX</div>
+        </div>
+        <span class="badge b-run" style="flex-shrink:0;"><div style="width:6px;height:6px;border-radius:50%;background:#1D9E75;" class="pulse-dot"></div>Running</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">
+        <span class="chip c-s"><div class="cd"></div>Search</span>
+        <span class="chip c-c"><div class="cd"></div>Code</span>
+        <span style="font-size:12px;color:#888780;">running for 18s</span>
+        <div class="prog-track" style="width:160px;margin-left:6px;"><div class="prog-fill prog-pulse" style="width:55%;"></div></div>
+      </div>
+      <div class="two-col">
+        <div>
+          <div class="card" style="overflow:hidden;">
+            <div style="padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);display:flex;align-items:center;gap:8px;">
+              <div class="ld pulse-dot"></div>
+              <span style="font-size:13px;font-weight:600;color:#1C1C1A;">Thought trace</span>
+              <span style="font-size:11.5px;color:#1D9E75;font-weight:500;">streaming live</span>
+            </div>
+            <div class="ev ev-t slide-in"><div class="ev-hdr"><span class="evb evb-t">Thought</span><span class="ev-ts">14:47:01</span></div><div class="ev-body ev-i">The user wants three things: research summary, top-3 paper summaries, and a Python snippet. I'll dispatch search first then code in parallel.</div></div>
+            <div class="ev ev-tc slide-in"><div class="ev-hdr"><span class="evb evb-tc">Tool call</span><span class="ev-ts">14:47:02</span></div><div style="font-size:12px;font-weight:600;color:#1C1C1A;margin-bottom:5px;">web_search · Search Agent</div><div class="ev-code">{"query": "diffusion models video generation 2024 breakthroughs"}</div></div>
+            <div class="ev ev-tr slide-in"><div class="ev-hdr"><span class="evb evb-tr">Tool result</span><span class="ev-ts">14:47:04</span></div><div style="font-size:12.5px;color:#2C2C2A;font-weight:500;margin-bottom:5px;">Returned 10 results · Sora, Lumiere, CogVideoX identified</div><div class="ev-prev">[{"title":"Sora: Video generation models as world simulators","score":0.94},{"title":"Lumiere: Space-Time Diffusion","score":0.91},...]</div></div>
+            <div class="ev ev-tc slide-in"><div class="ev-hdr"><span class="evb evb-tc">Tool call</span><span class="ev-ts">14:47:06</span></div><div style="font-size:12px;font-weight:600;color:#1C1C1A;margin-bottom:5px;">code_execute · Code Agent</div><div class="ev-code">{"instruction": "Write Python snippet using diffusers to load CogVideoX…", "language": "python"}</div></div>
+            <div class="ev ev-t" style="background:#FDFCFF;"><div class="ev-hdr"><span class="evb evb-t">Thought</span><span class="ev-ts">14:47:18</span></div><div class="ev-body ev-i">Code agent returned working snippet. Now synthesising paper summaries. Sora uses spacetime patch tokenisation…<span class="blink" style="color:#534AB7;font-weight:700;">|</span></div></div>
+          </div>
+        </div>
+        <div class="sum-panel">
+          <div class="card" style="overflow:hidden;margin-bottom:12px;">
+            <div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.06);"><span style="font-size:13px;font-weight:600;color:#1C1C1A;">Agent status</span></div>
+            <div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05);display:flex;align-items:center;gap:8px;"><span class="chip c-s" style="width:68px;justify-content:center;"><div class="cd"></div>Search</span><span style="font-size:12px;color:#1D9E75;font-weight:500;display:flex;align-items:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Done · 2.1s</span></div>
+            <div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05);display:flex;align-items:center;gap:8px;"><span class="chip c-c" style="width:68px;justify-content:center;"><div class="cd"></div>Code</span><span style="font-size:12px;color:#1D9E75;font-weight:500;display:flex;align-items:center;gap:4px;"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Done · 11.4s</span></div>
+            <div style="padding:10px 14px;display:flex;align-items:center;gap:8px;opacity:.4;"><span class="chip c-m" style="width:68px;justify-content:center;"><div class="cd"></div>Memory</span><span style="font-size:12px;color:#888780;font-weight:500;">Not used</span></div>
+          </div>
+          <div class="card" style="overflow:hidden;">
+            <div style="padding:12px 16px;border-bottom:1px solid rgba(0,0,0,.06);"><span style="font-size:13px;font-weight:600;color:#1C1C1A;">Progress</span></div>
+            <div class="sum-sec"><div class="sum-ti">Tokens so far</div><div class="sum-row"><span class="sum-k">Input</span><span class="sum-v">6,421</span></div><div class="sum-row"><span class="sum-k">Output</span><span class="sum-v">—</span></div></div>
+            <div class="sum-sec"><div class="sum-ti">Tasks</div><div class="sum-row"><span class="sum-k">Done</span><span class="sum-v">2 / 3</span></div></div>
+            <div class="sum-sec"><div class="sum-ti">Run ID</div><div style="font-family:monospace;font-size:12px;color:#534AB7;">run_f7a3b9</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE 3b — RUN DETAIL (completed — with final answer)
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:40px;"><div class="demo-tag">Page 3b — Runs (completed — user reads their answer)</div></div>
+<div class="demo-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:860px;">
+  <div class="sidebar">
+    <div class="sb-wm"><div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div><span class="wm-tx">NEXUS</span></div>
+    <nav class="sb-nav">
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>Orchestrator</a>
+      <div class="sb-divider"></div>
+      <div class="sb-section-label">My workspace</div>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/></svg>Dashboard</a>
+      <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Runs</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx=".75" fill="currentColor"/></svg>History</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Observability</a>
+    </nav>
+    <div class="sb-ft"><div class="ua">AK</div><span class="un">Aryan K.</span><div class="logout-btn"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><path d="M10 10l4-3-4-3v2H5v2h5v2z" fill="currentColor"/><path d="M8 13H3a1 1 0 01-1-1V3a1 1 0 011-1h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div></div>
+  </div>
+  <div class="main-w">
+    <div class="topbar"><span class="tb-ti">Run detail</span><div class="tb-div"></div><div class="tb-av">AK</div></div>
+    <div class="content">
+      <a href="#" class="back-link"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2L4 7l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>My dashboard</a>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px;">
+        <div>
+          <span class="run-id" style="font-size:13px;">run_f7a3b9</span>
+          <div style="font-size:15px;font-weight:500;color:#1C1C1A;margin:4px 0 10px;line-height:1.45;max-width:580px;">Research latest breakthroughs in diffusion models for video generation, summarise top 3 papers, and write a Python snippet to load CogVideoX</div>
+        </div>
+        <span class="badge b-done" style="flex-shrink:0;"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><path d="M2 5.5l2.5 2.5L9 3" stroke="#1D9E75" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Completed</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:18px;">
+        <span class="chip c-s"><div class="cd"></div>Search</span>
+        <span class="chip c-c"><div class="cd"></div>Code</span>
+        <span style="font-size:12px;color:#888780;">Finished in 24.3s · Today 14:47</span>
+      </div>
+
+      <!-- Final answer prominently at top -->
+      <div class="ans-box">
+        <div class="ans-lbl"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4L12 3" stroke="#1D9E75" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Your answer</div>
+        <div class="ans-body">
+          <strong>Video Diffusion Models — Breakthroughs (2024)</strong><br/><br/>
+          <strong>1. Sora (OpenAI)</strong> — Treats video as spacetime patches, enabling world-simulation at any resolution. Trained on diverse durations without recaptioning. Key innovation: unified images + video in one training regime.<br/><br/>
+          <strong>2. Lumiere (Google Research)</strong> — Space-Time U-Net generates the full video duration in a single pass (no keyframe interpolation), producing globally coherent motion free of flickering.<br/><br/>
+          <strong>3. CogVideoX (Zhipu AI/Tsinghua)</strong> — Open-source, 3D full-attention transformer. Strong prompt adherence. Available free via <code style="background:#F0EFE9;padding:1px 5px;border-radius:3px;font-size:13px;">diffusers</code>.<br/><br/>
+          <strong>Python — load CogVideoX:</strong>
+          <div style="background:#1C1C1A;border-radius:7px;padding:13px 16px;margin-top:10px;font-family:monospace;font-size:12.5px;line-height:1.7;color:#E8E7E3;overflow-x:auto;">
+            <span style="color:#7F77DD;">from</span> <span style="color:#378ADD;">diffusers</span> <span style="color:#7F77DD;">import</span> CogVideoXPipeline<br/>
+            <span style="color:#7F77DD;">import</span> <span style="color:#378ADD;">torch</span><br/><br/>
+            pipe = CogVideoXPipeline.from_pretrained(<span style="color:#EF9F27;">"THUDM/CogVideoX-5b"</span>, torch_dtype=torch.bfloat16).to(<span style="color:#EF9F27;">"cuda"</span>)<br/>
+            video = pipe(prompt=<span style="color:#EF9F27;">"A drone over misty mountains at golden hour"</span>, num_frames=<span style="color:#1D9E75;">49</span>).frames[<span style="color:#1D9E75;">0</span>]<br/><br/>
+            <span style="color:#7F77DD;">from</span> <span style="color:#378ADD;">diffusers.utils</span> <span style="color:#7F77DD;">import</span> export_to_video<br/>
+            export_to_video(video, <span style="color:#EF9F27;">"output.mp4"</span>, fps=<span style="color:#1D9E75;">8</span>)
+          </div>
+        </div>
+        <div class="ans-actions">
+          <button class="ans-btn"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="4" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M1 9V2a1 1 0 011-1h7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>Copy</button>
+          <button class="ans-btn"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 6.5A4.5 4.5 0 0011 6.5M2 6.5L4.5 4M2 6.5L4.5 9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>Follow-up</button>
+          <button class="ans-btn ans-btn-p"><svg width="11" height="11" viewBox="0 0 11 11" fill="none"><polygon points="2,1 10,5.5 2,10" fill="white"/></svg>New run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE 4 — HISTORY (user's own runs only)
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:40px;"><div class="demo-tag">Page 4 — History (Aryan's runs only — zero data leakage)</div></div>
+<div class="demo-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:640px;">
+  <div class="sidebar">
+    <div class="sb-wm"><div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div><span class="wm-tx">NEXUS</span></div>
+    <nav class="sb-nav">
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>Orchestrator</a>
+      <div class="sb-divider"></div>
+      <div class="sb-section-label">My workspace</div>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/></svg>Dashboard</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polyline points="8,5 8,8 10,10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Runs</a>
+      <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="7.25" width="12" height="1.5" rx=".75" fill="currentColor"/><rect x="2" y="10.5" width="8" height="1.5" rx=".75" fill="currentColor"/></svg>History</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Observability</a>
+    </nav>
+    <div class="sb-ft"><div class="ua">AK</div><span class="un">Aryan K.</span><div class="logout-btn"><svg viewBox="0 0 15 15" fill="none" width="15" height="15"><path d="M10 10l4-3-4-3v2H5v2h5v2z" fill="currentColor"/><path d="M8 13H3a1 1 0 01-1-1V3a1 1 0 011-1h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></div></div>
+  </div>
+  <div class="main-w">
+    <div class="topbar">
+      <span class="tb-ti">My history</span>
+      <div style="font-size:12px;color:#888780;background:#F0EFE9;border:1px solid rgba(0,0,0,.08);padding:3px 10px;border-radius:5px;">47 total runs · yours only</div>
+      <div class="tb-div"></div><div class="tb-av">AK</div>
+    </div>
+    <div class="content" style="padding:0;display:flex;flex-direction:column;">
+      <!-- Filter bar -->
+      <div style="background:#fff;border-bottom:1px solid rgba(0,0,0,.08);padding:11px 24px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <div style="height:32px;border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:0 10px;font-size:12.5px;color:#1C1C1A;background:#fff;display:flex;align-items:center;gap:6px;cursor:pointer;">All statuses<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+        <div style="height:32px;border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:0 10px;font-size:12.5px;color:#1C1C1A;background:#fff;display:flex;align-items:center;gap:6px;cursor:pointer;">All agents<svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></div>
+        <div style="width:1px;height:20px;background:rgba(0,0,0,.1);flex-shrink:0;"></div>
+        <div style="position:relative;display:flex;align-items:center;">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="position:absolute;left:9px;color:#888780;"><circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.3"/><path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+          <input style="height:32px;border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:0 12px 0 28px;font-size:12.5px;color:#1C1C1A;font-family:inherit;background:#fff;outline:none;width:200px;" placeholder="Search your runs…" />
+        </div>
+      </div>
+      <div style="flex:1;padding:20px 24px;overflow-y:auto;">
+        <div class="card">
+          <table>
+            <thead><tr><th>Run ID</th><th>Your query</th><th>Agents</th><th>Status</th><th>Duration</th><th>Started</th><th></th></tr></thead>
+            <tbody>
+              <tr><td><span class="run-id">run_f7a3b9</span></td><td class="qcell">Research diffusion models for video generation, top 3 papers…</td><td><span class="chip c-s" style="margin-right:3px;"><div class="cd"></div>Search</span><span class="chip c-c"><div class="cd"></div>Code</span></td><td><span class="badge b-done">Completed</span></td><td style="font-size:12.5px;color:#888780;">24.3s</td><td style="font-size:12.5px;color:#888780;">Today 14:47</td><td><a href="#" class="vl">View →</a></td></tr>
+              <tr><td><span class="run-id">run_9d12ef</span></td><td class="qcell">Summarize the top 5 AI research labs by publication count in 2024</td><td><span class="chip c-s"><div class="cd"></div>Search</span></td><td><span class="badge b-done">Completed</span></td><td style="font-size:12.5px;color:#888780;">3.2s</td><td style="font-size:12.5px;color:#888780;">Today 14:41</td><td><a href="#" class="vl">View →</a></td></tr>
+              <tr><td><span class="run-id">run_4a7bc1</span></td><td class="qcell">Generate a typed REST API client in Python for the GitHub API</td><td><span class="chip c-c"><div class="cd"></div>Code</span></td><td><span class="badge b-done">Completed</span></td><td style="font-size:12.5px;color:#888780;">12.7s</td><td style="font-size:12.5px;color:#888780;">Today 14:32</td><td><a href="#" class="vl">View →</a></td></tr>
+              <tr class="row-fail"><td><span class="run-id">run_2e88dd</span></td><td class="qcell">What did I search for last week about Kubernetes networking?</td><td><span class="chip c-m"><div class="cd"></div>Memory</span></td><td><span class="badge b-fail">Failed</span></td><td style="font-size:12.5px;color:#888780;">847ms</td><td style="font-size:12.5px;color:#888780;">Today 13:58</td><td><a href="#" class="vl">View →</a></td></tr>
+              <tr><td><span class="run-id">run_77f1a3</span></td><td class="qcell">Compound interest for $50,000 at 7.3% over 20 years</td><td><span class="chip c-t"><div class="cd"></div>Tool</span></td><td><span class="badge b-done">Completed</span></td><td style="font-size:12.5px;color:#888780;">1.1s</td><td style="font-size:12.5px;color:#888780;">Today 13:44</td><td><a href="#" class="vl">View →</a></td></tr>
+            </tbody>
+          </table>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-top:1px solid rgba(0,0,0,.06);background:#fff;">
+            <span style="font-size:12.5px;color:#888780;">Showing 1–5 of 47 your runs</span>
+            <div style="display:flex;gap:4px;">
+              <button style="min-width:28px;height:28px;border-radius:5px;border:1px solid rgba(0,0,0,.1);background:#fff;cursor:not-allowed;font-size:12.5px;color:#C8C7C3;display:flex;align-items:center;justify-content:center;" disabled>←</button>
+              <button style="min-width:28px;height:28px;border-radius:5px;border:1px solid #534AB7;background:#534AB7;color:white;font-size:12.5px;display:flex;align-items:center;justify-content:center;">1</button>
+              <button style="min-width:28px;height:28px;border-radius:5px;border:1px solid rgba(0,0,0,.1);background:#fff;cursor:pointer;font-size:12.5px;color:#1C1C1A;display:flex;align-items:center;justify-content:center;">2</button>
+              <button style="min-width:28px;height:28px;border-radius:5px;border:1px solid rgba(0,0,0,.1);background:#fff;cursor:pointer;font-size:12.5px;color:#1C1C1A;display:flex;align-items:center;justify-content:center;">3</button>
+              <button style="min-width:28px;height:28px;border-radius:5px;border:1px solid rgba(0,0,0,.1);background:#fff;cursor:pointer;font-size:12.5px;color:#1C1C1A;display:flex;align-items:center;justify-content:center;">→</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE 5 — MEMORY (user's own agent memory only)
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:40px;"><div class="demo-tag">Page 5 — Memory (Aryan's embeddings — from his runs only)</div></div>
+<div class="demo-wrap">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:660px;">
+  <div class="sidebar">
+    <div class="sb-wm"><div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div><span class="wm-tx">NEXUS</span></div>
+    <nav class="sb-nav">
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>Orchestrator</a>
+      <div class="sb-divider"></div>
+      <div class="sb-section-label">My workspace</div>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/></svg>Dashboard</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/></svg>Runs</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/></svg>History</a>
+      <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/><path d="M2.5 6c0 2.5 2.5 5 5.5 5s5.5-2.5 5.5-5" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Observability</a>
+    </nav>
+    <div class="sb-ft"><div class="ua">AK</div><span class="un">Aryan K.</span></div>
+  </div>
+  <div class="main-w">
+    <div class="topbar">
+      <span class="tb-ti">My memory</span>
+      <div style="font-size:12px;color:#888780;background:#F0EFE9;border:1px solid rgba(0,0,0,.08);padding:3px 10px;border-radius:5px;">184 embeddings · from your runs only</div>
+      <div class="tb-div"></div><div class="tb-av">AK</div>
+    </div>
+    <div class="content">
+      <div style="font-size:13px;color:#888780;margin-bottom:18px;line-height:1.55;">
+        Search across all outputs from your past agent runs. Powered by pgvector 384-dim cosine similarity. <strong style="color:#1C1C1A;">Only your data is searched</strong> — other users' memory is never accessible.
+      </div>
+      <!-- Search bar -->
+      <div style="background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.08);padding:16px 18px;margin-bottom:20px;">
+        <div style="display:flex;gap:10px;margin-bottom:10px;">
+          <div style="position:relative;flex:1;display:flex;align-items:center;">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" style="position:absolute;left:12px;color:#888780;"><circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.4"/><path d="M11 11l3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <input style="width:100%;height:40px;border:1.5px solid #534AB7;box-shadow:0 0 0 3px rgba(83,74,183,.12);border-radius:7px;padding:0 14px 0 36px;font-size:14px;color:#1C1C1A;font-family:inherit;outline:none;" value="diffusion model video generation" />
+          </div>
+          <button style="background:#534AB7;color:white;border:none;padding:0 18px;height:40px;border-radius:7px;font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px;">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="5.5" cy="5.5" r="4" stroke="white" stroke-width="1.4"/><path d="M9 9l3 3" stroke="white" stroke-width="1.4" stroke-linecap="round"/></svg>Search
+          </button>
+        </div>
+        <div style="font-size:12px;color:#888780;display:flex;align-items:center;gap:8px;">
+          <span>Try:</span>
+          <span style="background:#F0EFE9;color:#534AB7;padding:2px 9px;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid rgba(83,74,183,.15);">LLM reasoning</span>
+          <span style="background:#F0EFE9;color:#534AB7;padding:2px 9px;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid rgba(83,74,183,.15);">Python quicksort</span>
+          <span style="background:#F0EFE9;color:#534AB7;padding:2px 9px;border-radius:4px;font-size:12px;font-weight:500;cursor:pointer;border:1px solid rgba(83,74,183,.15);">Tokyo weather</span>
+        </div>
+      </div>
+      <!-- Result cards (2-col) -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:600;color:#1C1C1A;">2 results from your memory</span>
+        <span style="font-size:12px;color:#888780;">searched in 412ms</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div style="background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.07);padding:16px;position:relative;">
+          <span style="position:absolute;top:14px;right:14px;background:#D4F3E6;color:#085041;padding:2px 8px;border-radius:4px;font-size:11.5px;font-weight:700;">0.96</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><span class="chip c-s"><div class="cd"></div>Search</span><span style="font-size:11.5px;color:#888780;">run_f7a3b9</span></div>
+          <div style="font-size:12px;color:#888780;font-style:italic;margin-bottom:8px;">"Research diffusion models for video generation…"</div>
+          <div style="font-size:13px;color:#1C1C1A;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px;">CogVideoX (Zhipu AI) is an open-source 3D full-attention transformer achieving competitive quality at lower compute. Available via diffusers. Lumiere introduces Space-Time U-Net for globally coherent motion without keyframe interpolation artifacts.</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:11.5px;color:#B0AFA9;">Today · 14:47</span><a href="#" style="font-size:12px;color:#534AB7;font-weight:500;text-decoration:none;">View run →</a></div>
+        </div>
+        <div style="background:#fff;border-radius:8px;border:1px solid rgba(0,0,0,.07);padding:16px;position:relative;">
+          <span style="position:absolute;top:14px;right:14px;background:#FEF3E2;color:#884A05;padding:2px 8px;border-radius:4px;font-size:11.5px;font-weight:700;">0.81</span>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><span class="chip c-c"><div class="cd"></div>Code</span><span style="font-size:11.5px;color:#888780;">run_4a7bc1</span></div>
+          <div style="font-size:12px;color:#888780;font-style:italic;margin-bottom:8px;">"Generate a typed REST API client in Python for GitHub API"</div>
+          <div style="font-size:13px;color:#1C1C1A;line-height:1.6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:10px;">Implemented a fully typed GitHub REST API client using httpx and pydantic. Covers /repos, /users, /issues endpoints. Includes retry logic and rate-limit handling. Tested with pytest and mocked responses.</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;"><span style="font-size:11.5px;color:#B0AFA9;">Today · 14:32</span><a href="#" style="font-size:12px;color:#534AB7;font-weight:500;text-decoration:none;">View run →</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+  PAGE 6 — OBSERVABILITY (user's own usage stats)
+═══════════════════════════════════════════════════════════ -->
+<div class="demo-block" style="padding-top:40px;"><div class="demo-tag">Page 6 — Observability (Aryan's personal usage stats — not system-wide)</div></div>
+<div class="demo-wrap" style="padding-bottom:48px;">
+<div class="shell" style="border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.13);height:640px;">
+  <div class="sidebar">
+    <div class="sb-wm"><div class="sb-ic"><svg viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="5" height="5" rx="1" fill="white"/><rect x="8" y="1" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="1" y="8" width="5" height="5" rx="1" fill="white" opacity=".6"/><rect x="8" y="8" width="5" height="5" rx="1" fill="white" opacity=".3"/></svg></div><span class="wm-tx">NEXUS</span></div>
+    <nav class="sb-nav">
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><polygon points="6,5 11,8 6,11" fill="currentColor"/></svg>Orchestrator</a>
+      <div class="sb-divider"></div>
+      <div class="sb-section-label">My workspace</div>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/></svg>Dashboard</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/></svg>Runs</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="1.5" rx=".75" fill="currentColor"/></svg>History</a>
+      <a class="ni" href="#"><svg viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="6" rx="5.5" ry="4" stroke="currentColor" stroke-width="1.5"/></svg>Memory</a>
+      <a class="ni active" href="#"><svg viewBox="0 0 16 16" fill="none"><polyline points="2,11 5,7 8,9 11,4 14,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>Observability</a>
+    </nav>
+    <div class="sb-ft"><div class="ua">AK</div><span class="un">Aryan K.</span></div>
+  </div>
+  <div class="main-w">
+    <div class="topbar">
+      <span class="tb-ti">My observability</span>
+      <div style="font-size:12px;color:#888780;background:#F0EFE9;border:1px solid rgba(0,0,0,.08);padding:3px 10px;border-radius:5px;">Your usage — last 7 days</div>
+      <div class="tb-div"></div><div class="tb-av">AK</div>
+    </div>
+    <div class="content">
+      <div style="font-size:13px;color:#888780;margin-bottom:20px;">Showing your personal token usage, latency, and agent performance. This data is private to your account.</div>
+      <!-- Personal stats summary row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px;">
+        <div class="card" style="padding:16px 18px;"><div style="font-size:12px;color:#888780;margin-bottom:8px;">My tokens (7d)</div><div style="font-size:24px;font-weight:500;color:#1C1C1A;margin-bottom:6px;">184k</div><div style="font-size:11.5px;color:#1D9E75;display:flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>↑ 23% vs prior week</div></div>
+        <div class="card" style="padding:16px 18px;"><div style="font-size:12px;color:#888780;margin-bottom:8px;">My cost (7d)</div><div style="font-size:24px;font-weight:500;color:#1C1C1A;margin-bottom:6px;">$0.54</div><div style="font-size:11.5px;color:#888780;">avg $0.012/run</div></div>
+        <div class="card" style="padding:16px 18px;"><div style="font-size:12px;color:#888780;margin-bottom:8px;">My avg latency</div><div style="font-size:24px;font-weight:500;color:#1C1C1A;margin-bottom:6px;">2.1s</div><div style="font-size:11.5px;color:#1D9E75;display:flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8V2M2 5l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>0.3s faster</div></div>
+        <div class="card" style="padding:16px 18px;"><div style="font-size:12px;color:#888780;margin-bottom:8px;">My success rate</div><div style="font-size:24px;font-weight:500;color:#1C1C1A;margin-bottom:6px;">91.5%</div><div style="font-size:11.5px;color:#E24B4A;display:flex;align-items:center;gap:4px;"><svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2v6M2 5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>↓ 2.1%</div></div>
+      </div>
+      <!-- Agent usage breakdown -->
+      <div class="card">
+        <div style="padding:12px 18px;border-bottom:1px solid rgba(0,0,0,.06);"><span style="font-size:13px;font-weight:600;color:#1C1C1A;">My agent usage — 7 days</span></div>
+        <table>
+          <thead><tr><th>Agent</th><th>My runs</th><th>Success rate</th><th>Avg latency</th><th>Tokens used</th><th>My cost</th></tr></thead>
+          <tbody>
+            <tr><td><span class="chip c-s"><div class="cd"></div>Search</span></td><td style="font-weight:500;">21</td><td style="color:#1D9E75;font-weight:600;">95.2%</td><td style="color:#888780;">2.1s</td><td style="color:#888780;">91,204</td><td style="color:#888780;">$0.21</td></tr>
+            <tr><td><span class="chip c-c"><div class="cd"></div>Code</span></td><td style="font-weight:500;">14</td><td style="color:#BA7517;font-weight:600;">85.7%</td><td style="color:#888780;">11.4s</td><td style="color:#888780;">68,342</td><td style="color:#888780;">$0.24</td></tr>
+            <tr><td><span class="chip c-m"><div class="cd"></div>Memory</span></td><td style="font-weight:500;">8</td><td style="color:#1D9E75;font-weight:600;">100%</td><td style="color:#888780;">0.4s</td><td style="color:#888780;">12,102</td><td style="color:#888780;">$0.04</td></tr>
+            <tr><td><span class="chip c-t"><div class="cd"></div>Tool</span></td><td style="font-weight:500;">4</td><td style="color:#1D9E75;font-weight:600;">100%</td><td style="color:#888780;">1.3s</td><td style="color:#888780;">12,456</td><td style="color:#888780;">$0.05</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+</body>
+</html>
