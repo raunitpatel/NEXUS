@@ -86,6 +86,12 @@ orchestrator_run_duration_seconds = Histogram(
     buckets=(1.0, 5.0, 10.0, 20.0, 30.0, 60.0, 120.0, 300.0),
 )
 
+active_runs = Gauge(
+    name="nexus_active_runs",
+    documentation="Number of orchestration runs currently in flight.",
+    labelnames=["service"],
+)
+
 # Kafka metrics
 
 kafka_messages_produced_total = Counter(

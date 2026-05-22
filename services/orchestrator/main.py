@@ -21,7 +21,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from config import settings
 from graph import build_graph
 from shared.logging import configure_logging
-from shared.metrics import configure_metrics
+from shared.metrics import configure_metrics, active_runs, orchestrator_runs_total
+
 from shared.telemetry import configure_telemetry
 from state import OrchestratorState
 
@@ -209,15 +210,20 @@ async def _run_graph(
         state: Initial OrchestratorState for this run.
         run_id: Run UUID string for structured log correlation.
     """
+    active_runs.labels(service="orchestrator").inc()
     try:
         await graph.ainvoke(state)  # type: ignore[attr-defined]
         logger.info("orchestrator.run_complete", run_id=run_id)
+        orchestrator_runs_total.labels(status="completed").inc()
     except Exception as exc:
         logger.error(
             "orchestrator.run_failed",
             run_id=run_id,
             error=str(exc),
         )
+        orchestrator_runs_total.labels(status="failed").inc()
+    finally:
+        active_runs.labels(service="orchestrator").dec()
 
 
 app = create_app()

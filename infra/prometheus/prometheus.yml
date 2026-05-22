@@ -1,8 +1,3 @@
-# nexus/infra/prometheus/prometheus.yml
-# Prometheus scrape configuration for all NEXUS services.
-# Application targets are inactive in AGNT-001 (services not yet running).
-# They activate as services are added in AGNT-003 through AGNT-007.
-
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -14,38 +9,38 @@ scrape_configs:
     static_configs:
       - targets: ['localhost:9090']
 
-  # API Gateway (added in AGNT-003)
+  # API Gateway
   - job_name: 'gateway'
     static_configs:
-      - targets: ['localhost:8080']
+      - targets: ['nexus-gateway:8000']
     metrics_path: /metrics
 
-  # Orchestrator (added in AGNT-004)
+  # Orchestrator
   - job_name: 'orchestrator'
     static_configs:
-      - targets: ['orchestrator:8001']
+      - targets: ['nexus-orchestrator:8001']
     metrics_path: /metrics
 
-  # Search Agent (added in AGNT-005)
+  # Search Agent
   - job_name: 'search_agent'
     static_configs:
-      - targets: ['search-agent:8002']
+      - targets: ['nexus-search-agent:8002']
     metrics_path: /metrics
 
-  # Code Agent (added in AGNT-005)
+  # Code Agent
   - job_name: 'code_agent'
     static_configs:
-      - targets: ['code-agent:8003']
+      - targets: ['nexus-code-agent:8003']
     metrics_path: /metrics
 
-  # Memory Agent (added in AGNT-006)
+  # Memory Agent
   - job_name: 'memory_agent'
     static_configs:
-      - targets: ['memory-agent:8004']
+      - targets: ['nexus-memory-agent:8004']
     metrics_path: /metrics
 
-  # Tool Agent (added in AGNT-007)
+  # Tool Agent
   - job_name: 'tool_agent'
     static_configs:
-      - targets: ['tool-agent:8005']
+      - targets: ['nexus-tool-agent:8005']
     metrics_path: /metrics

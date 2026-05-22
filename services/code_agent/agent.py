@@ -24,6 +24,13 @@ import re
 import time
 from typing import Any
 
+from shared.metrics import (
+    agent_task_duration_seconds,
+    agent_tasks_total,
+    llm_tokens_total,
+    llm_requests_total,
+)
+
 import structlog
 
 from config import settings
@@ -191,6 +198,10 @@ class CodeAgent:
                     exit_code=1,
                     iterations=iteration,
                 )
+                agent_task_duration_seconds.labels(agent="code", status="error").observe(
+                    int((time.monotonic() - start_ms) * 1000) / 1000
+                )
+                agent_tasks_total.labels(agent="code", status="error").inc()
                 await self._publish_event(
                     run_id=run_id,
                     task_id=task_id,
@@ -243,6 +254,9 @@ class CodeAgent:
                     iterations=iteration,
                     elapsed_ms=elapsed,
                 )
+
+                agent_task_duration_seconds.labels(agent="code", status="success").observe(elapsed / 1000)
+                agent_tasks_total.labels(agent="code", status="success").inc()
                 await self._publish_event(
                     run_id=run_id,
                     task_id=task_id,
@@ -270,6 +284,9 @@ class CodeAgent:
             exit_code=execution.exit_code,
             elapsed_ms=elapsed,
         )
+
+        agent_task_duration_seconds.labels(agent="code", status="error").observe(elapsed / 1000)
+        agent_tasks_total.labels(agent="code", status="error").inc()
 
         await self._publish_event(
             run_id=run_id,

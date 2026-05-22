@@ -20,6 +20,13 @@ import json
 import time
 from typing import Any
 
+from shared.metrics import (
+    agent_task_duration_seconds,
+    agent_tasks_total,
+    llm_tokens_total,
+    llm_requests_total,
+)
+
 import structlog
 
 from cached_llm_provider import CachedLLMProvider
@@ -209,6 +216,10 @@ class SearchAgent:
         except LLMProviderError as exc:
             logger.error("search_agent.llm_error", run_id=run_id, task_id=task_id, error=str(exc))
             elapsed = int((time.monotonic() - start_ms) * 1000)
+
+            agent_task_duration_seconds.labels(agent="search", status="error").observe(elapsed / 1000)
+            agent_tasks_total.labels(agent="search", status="error").inc()
+
             result = SearchAgentResult(
                 results=[],
                 summary=f"Search failed: LLM provider error — {exc}",
@@ -225,6 +236,13 @@ class SearchAgent:
             return result
 
         elapsed = int((time.monotonic() - start_ms) * 1000)
+        agent_task_duration_seconds.labels(agent="search", status="success").observe(elapsed / 1000)
+        agent_tasks_total.labels(agent="search", status="success").inc()
+        model_name = self._model_name()
+        llm_tokens_total.labels(service="search-agent", model=model_name, type="input").inc(
+            total_tokens  # approximate — full breakdown requires per-call tracking
+        )
+        llm_requests_total.labels(service="search-agent", model=model_name, status="success").inc(3)
         result = SearchAgentResult(
             results=ranked_results,
             summary=summary,

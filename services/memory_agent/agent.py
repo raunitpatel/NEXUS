@@ -33,6 +33,8 @@ from config import settings
 from embeddings import EmbeddingModel
 from pgvector_store import cosine_search, insert_embedding
 
+from shared.metrics import agent_task_duration_seconds, agent_tasks_total
+
 logger = structlog.get_logger(__name__)
 
 _CACHE_KEY_PREFIX = "vsearch:"
@@ -189,6 +191,11 @@ class MemoryAgent:
             duration_ms=duration_ms,
         )
 
+        agent_task_duration_seconds.labels(agent="memory-embed", status="success").observe(
+            duration_ms / 1000
+        )
+        agent_tasks_total.labels(agent="memory-embed", status="success").inc()
+
         return EmbedResult(
             embedding_id=embedding_id,
             dimensions=self._model.dimensions,
@@ -274,6 +281,11 @@ class MemoryAgent:
             duration_ms=duration_ms,
         )
 
+        agent_task_duration_seconds.labels(agent="memory-search", status="success").observe(
+            duration_ms / 1000
+        )
+        agent_tasks_total.labels(agent="memory-search", status="success").inc()
+        
         return SearchResult(results=results, from_cache=False, duration_ms=duration_ms)
 
 

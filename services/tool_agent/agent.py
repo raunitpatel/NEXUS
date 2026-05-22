@@ -31,6 +31,13 @@ from tools.calculator import CalculatorTool
 from tools.weather import WeatherTool
 from tools.wikipedia import WikipediaTool
 
+from shared.metrics import (
+    agent_task_duration_seconds,
+    agent_tasks_total,
+    llm_tokens_total,
+    llm_requests_total,
+)
+
 logger = structlog.get_logger(__name__)
 
 # System prompts
@@ -178,6 +185,10 @@ class ToolAgent:
                 duration_ms=elapsed,
                 error=str(exc),
             )
+
+            agent_task_duration_seconds.labels(agent="tool", status="error").observe(elapsed / 1000)
+            agent_tasks_total.labels(agent="tool", status="error").inc()
+            
             await self._publish_event(
                 run_id=run_id, task_id=task_id, event_type="agent_end",
                 payload={**result.to_dict(), "error": str(exc)},
@@ -271,6 +282,24 @@ class ToolAgent:
             tokens=total_tokens,
             duration_ms=elapsed,
         )
+
+        agent_task_duration_seconds.labels(
+            agent="tool", status="success" if not result.error else "error"
+        ).observe(elapsed / 1000)
+        agent_tasks_total.labels(
+            agent="tool", status="success" if not result.error else "error"
+        ).inc()
+        llm_tokens_total.labels(
+            service="tool-agent",
+            model=settings.anthropic_model if settings.llm_provider == "claude" else settings.gemini_model,
+            type="input",
+        ).inc(result.tokens_used)
+        llm_requests_total.labels(
+            service="tool-agent",
+            model=settings.anthropic_model if settings.llm_provider == "claude" else settings.gemini_model,
+            status="success" if not result.error else "error",
+        ).inc()
+
         return result
 
     async def _execute_tool(
