@@ -11,6 +11,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import clsx from 'clsx'
+import { removeToken } from '@/lib/auth'
 
 // ── Nav item definition ───────────────────────────────────────────────────────
 
@@ -186,11 +187,8 @@ export function Sidebar({ displayName = 'User', initials = 'U' }: SidebarProps) 
         </span>
         <button
           onClick={() => {
-            // removeToken and redirect — full logout wired in AGNT-020
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('nexus_jwt')
-              window.location.href = '/login'
-            }
+            removeToken()
+            window.location.href = '/login'
           }}
           className="text-nexus-muted hover:text-white transition-colors"
           aria-label="Sign out"

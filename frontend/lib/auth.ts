@@ -7,6 +7,7 @@
 const TOKEN_KEY = "access_token";
 const COOKIE_NAME = "nexus_token";
 const COOKIE_MAX_AGE = 86400; // 24 hours
+const TOKEN_CHANGE_EVENT = "nexus-token-changed";
 
 /**
  * Decode the payload of a JWT without verifying the signature.
@@ -27,19 +28,52 @@ function decodePayload(token: string): Record<string, unknown> | null {
  * Persist the JWT to localStorage and set the nexus_token cookie
  * so Edge Middleware can read it for route protection.
  */
-export function setToken(token: string): void {
+function dispatchTokenChange(token: string | null): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(TOKEN_KEY, token);
-  document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+  window.dispatchEvent(new CustomEvent(TOKEN_CHANGE_EVENT, { detail: { token } }))
+}
+
+export function subscribeTokenChange(listener: (token: string | null) => void): () => void {
+  if (typeof window === "undefined") return () => {}
+
+  const handler = (event: Event) => {
+    const detail = (event as CustomEvent<{ token: string | null }>).detail
+    listener(detail?.token ?? null)
+  }
+
+  window.addEventListener(TOKEN_CHANGE_EVENT, handler)
+  return () => window.removeEventListener(TOKEN_CHANGE_EVENT, handler)
+}
+
+export function setToken(token: string, remember = true): void {
+  if (typeof window === "undefined") return;
+
+  if (remember) {
+    localStorage.setItem(TOKEN_KEY, token);
+    sessionStorage.removeItem(TOKEN_KEY);
+    document.cookie = `${COOKIE_NAME}=${token}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
+  } else {
+    sessionStorage.setItem(TOKEN_KEY, token);
+    localStorage.removeItem(TOKEN_KEY);
+    document.cookie = `${COOKIE_NAME}=${token}; path=/; SameSite=Lax`;
+  }
+
+  dispatchTokenChange(token)
 }
 
 /**
- * Read the JWT from localStorage.
+ * Read the JWT from browser storage.
  * Returns null if running server-side or token is absent.
  */
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem(TOKEN_KEY);
+  const fromStorage = localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
+  if (fromStorage) return fromStorage;
+
+  // Fallback: try to read the nexus_token cookie (set by setToken)
+  const match = document.cookie.match(new RegExp('(?:^|; )' + COOKIE_NAME + '=([^;]*)'))
+  if (match) return decodeURIComponent(match[1])
+  return null
 }
 
 /**
@@ -48,7 +82,9 @@ export function getToken(): string | null {
 export function removeToken(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
   document.cookie = `${COOKIE_NAME}=; path=/; max-age=0`;
+  dispatchTokenChange(null)
 }
 
 /**

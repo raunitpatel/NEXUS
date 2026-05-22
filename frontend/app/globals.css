@@ -35,3 +35,27 @@
     background: #888780;
   }
 }
+
+/* Dark mode overrides (basic): toggled by adding `.dark` to <html> */
+.dark {
+  color-scheme: dark;
+}
+
+/* Page background and surfaces */
+.dark body {
+  background-color: #0b0b0d;
+  color: #e6e6e6;
+}
+
+/* Replace common light surfaces */
+.dark .bg-white { background-color: #0f1113 !important; }
+.dark .bg-nexus-bg { background-color: #0b0b0d !important; }
+.dark .border-black\/\[0.08\] { border-color: rgba(255,255,255,0.06) !important; }
+.dark .text-nexus-dark { color: #e6e6e6 !important; }
+.dark .text-nexus-body { color: #d8d8d8 !important; }
+.dark .text-nexus-muted { color: #9a9a9a !important; }
+.dark .bg-nexus-accent { background-color: #6b5ee0 !important; }
+.dark .tb-ib:hover { background: rgba(255,255,255,0.03) !important; }
+
+/* Inputs */
+.dark input, .dark textarea { background-color: #0f1113; color: #e6e6e6; border-color: rgba(255,255,255,0.06); }

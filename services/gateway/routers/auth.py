@@ -84,12 +84,13 @@ def _verify_password(plain: str, hashed: str) ->bool:
     """
     return _pwd_context.verify(plain, hashed)
 
-def _create_access_token(user_id: str) -> tuple[str, str]:
+def _create_access_token(user_id: str, display_name: str | None = None) -> tuple[str, str]:
     """
     Create a signed JWT access token for the given user.
 
     Args:
         user_id: The UUID string of the authenticated user.
+        display_name: Optional display name to include in the token payload.
 
     Returns:
         Tuple of (encoded_jwt, jti) where jti is the unique token identifier
@@ -104,6 +105,9 @@ def _create_access_token(user_id: str) -> tuple[str, str]:
         "iat": now,
         "exp": expire,
     }
+    if display_name is not None:
+        payload["display_name"] = display_name
+
     token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return token, jti
 
@@ -217,8 +221,8 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Generate JWT
-    token, jti = _create_access_token(user_id=str(row.id))
+    # Generate JWT, including the user's display name for client-side UI.
+    token, jti = _create_access_token(user_id=str(row.id), display_name=row.display_name)
 
     # Write session to Redis — failure is fatal
     try:

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 /** Protected route prefixes — middleware blocks unauthenticated access. */
-const PROTECTED_PREFIXES = ["/dashboard", "/agents"];
+const PROTECTED_PREFIXES = [
+  '/dashboard',
+  '/orchestrator',
+  '/runs',
+  '/history',
+  '/memory',
+  '/observability',
+  '/agents',
+]
 
 /** Public routes — always accessible, even with a valid token. */
-const PUBLIC_PATHS = ["/login", "/register", "/"];
+const PUBLIC_PATHS = ["/login", "/register", "/terms", "/privacy", "/"];
 
 /**
  * Decode the payload of a JWT without verifying the signature.

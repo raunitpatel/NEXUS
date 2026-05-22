@@ -187,6 +187,7 @@ async def test_login_redis_failure_returns_503(
     hashed = _hash_password("Test1234!")
     mock_row = MagicMock()
     mock_row.id = str(uuid.uuid4())
+    mock_row.display_name = "testuser"
     mock_row.password_hash = hashed
 
     mock_result = MagicMock()
@@ -210,7 +211,7 @@ async def test_login_redis_failure_returns_503(
 
 
 def test_create_access_token_contains_required_claims() -> None:
-    """_create_access_token returns token with sub, jti, iat, exp claims."""
+    """_create_access_token returns token with sub, jti, iat, exp, and display_name claims."""
     import importlib
     import config as cfg
 
@@ -220,11 +221,12 @@ def test_create_access_token_contains_required_claims() -> None:
     from routers.auth import _create_access_token
 
     user_id = str(uuid.uuid4())
-    token, jti = _create_access_token(user_id)
+    token, jti = _create_access_token(user_id, display_name="Test User")
 
     payload = jwt.decode(token, TEST_SECRET, algorithms=["HS256"])
     assert payload["sub"] == user_id
     assert payload["jti"] == jti
+    assert payload["display_name"] == "Test User"
     assert "iat" in payload
     assert "exp" in payload
 
