@@ -18,28 +18,14 @@ from state import OrchestratorState
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, AsyncSession
-from nodes import _redis_client
+from nodes import get_redis_client
 from sse_emitter import emit_event
+
+from nodes.db import get_db_engine
 
 logger = structlog.get_logger(__name__)
 
-# Module-level engine reference — set by main.py lifespan
-# This is the standard pattern for sharing engine with LangGraph nodes
-# that cannot receive FastAPI Depends() injection.
-_db_engine: AsyncEngine | None = None
 
-
-def set_db_engine(engine: AsyncEngine) -> None:
-    """
-    Store the AsyncEngine for use by record_result and finalize_run.
-
-    Called once from main.py lifespan after engine creation.
-
-    Args:
-        engine: The SQLAlchemy async engine bound to nexus_db.
-    """
-    global _db_engine
-    _db_engine = engine
 
 
 async def _update_task_record(
@@ -115,10 +101,11 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
     db_status = "failed" if has_error else "completed"
 
     # Update DB
-    if _db_engine is not None:
+    engine = get_db_engine()
+    if engine is not None:
         try:
             await _update_task_record(
-                engine=_db_engine,
+                engine=engine,
                 task_id=task_id,
                 status=db_status,
                 output=task_result.get("output"),
@@ -145,7 +132,14 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
     completed_tasks.append(task_result)
 
     try:
-        if _redis_client is not None:
+        _redis_client = get_redis_client()
+        if _redis_client is None:
+            logger.error(
+                "record_result.redis_client_none",
+                run_id=run_id,
+                warning="SSE terminal event will NOT be delivered — _redis_client is None",
+            )
+        else:
             await emit_event(
                 run_id=run_id,
                 event_type="tool_result",

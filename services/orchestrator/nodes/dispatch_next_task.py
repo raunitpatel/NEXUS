@@ -18,7 +18,8 @@ import httpx
 import structlog
 
 from state import OrchestratorState, TaskPlan
-from nodes import _redis_client
+from nodes import get_redis_client
+from nodes.task_persistence import task_exists
 from sse_emitter import emit_event
 
 logger = structlog.get_logger(__name__)
@@ -80,6 +81,49 @@ def _select_next_task(
             return task
     return None
 
+def _remap_input_for_agent(
+    agent_type: str,
+    raw_input: dict[str, Any],
+) -> dict[str, Any]:
+    """
+    Remap task input keys to match each agent service's expected schema.
+
+    decompose_query builds task input as {"query": ..., "description": ...}.
+    Each agent service has a different field name for the primary instruction:
+    - search:       expects "query"      → no change needed
+    - code:         expects "instruction" → map from "description"
+    - memory_read:  expects "query"      → no change needed
+    - memory_write: expects "content"    → map from "description"
+    - tool:         expects "instruction" → map from "description"
+
+    Args:
+        agent_type: The agent type string from the task plan.
+        raw_input: The input dict as built by decompose_query.
+
+    Returns:
+        Remapped input dict with correct keys for the target agent.
+    """
+    description = raw_input.get("description", raw_input.get("query", ""))
+    query = raw_input.get("query", description)
+
+    if agent_type == "search":
+        return {"query": query}
+
+    if agent_type == "code":
+        return {"instruction": description, "language": "python"}
+
+    if agent_type == "memory_read":
+        return {"query": query}
+
+    if agent_type == "memory_write":
+        return {"content": description, "content_type": "task_output"}
+
+    if agent_type == "tool":
+        return {"instruction": description}
+
+    # synthesize and any unknown types — pass through as-is
+    return raw_input
+
 
 async def dispatch_next_task(state: OrchestratorState) -> dict[str, Any]:
     """
@@ -115,15 +159,36 @@ async def dispatch_next_task(state: OrchestratorState) -> dict[str, Any]:
         logger.error("node.dispatch_next_task.unknown_agent_type", run_id=run_id, error=str(exc))
         return {"error": str(exc)}
 
+    task_id = next_task["task_id"]
+    try:
+        if not await task_exists(task_id):
+            msg = f"Task {task_id} does not exist in the tasks table before dispatch."
+            logger.error("node.dispatch_next_task.missing_task_record", run_id=run_id, task_id=task_id)
+            return {"error": msg}
+        logger.info("task.exists.confirmed", run_id=run_id, task_id=task_id)
+    except Exception as exc:
+        logger.error("node.dispatch_next_task.task_existence_check_failed", run_id=run_id, task_id=task_id, error=str(exc))
+        return {"error": str(exc)}
+
+    raw_input = next_task.get("input", {})
+    agent_input = _remap_input_for_agent(agent_type, raw_input)
+
     payload = {
         "run_id": run_id,
         "task_id": next_task["task_id"],
         "user_id": state["user_id"],
         "task_type": next_task.get("task_type", agent_type),
-        "input": next_task.get("input", {}),
+        "input": agent_input,
         "attempt": attempt,
     }
 
+    logger.info(
+        "task.dispatching",
+        run_id=run_id,
+        task_id=next_task["task_id"],
+        agent_type=agent_type,
+        agent_url=agent_url,
+    )
     logger.info(
         "node.dispatch_next_task.dispatching",
         run_id=run_id,
@@ -174,7 +239,14 @@ async def dispatch_next_task(state: OrchestratorState) -> dict[str, Any]:
     )
 
     try:
-        if _redis_client is not None:
+        _redis_client = get_redis_client()
+        if _redis_client is None:
+            logger.error(
+                "dispach_next_task.redis_client_none",
+                run_id=run_id,
+                warning="SSE terminal event will NOT be delivered — _redis_client is None",
+            )
+        else:
             await emit_event(
                 run_id=run_id,
                 event_type="orchestrator_dispatch",

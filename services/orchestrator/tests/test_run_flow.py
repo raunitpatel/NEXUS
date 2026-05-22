@@ -88,8 +88,10 @@ async def test_full_graph_run_with_mocked_agents() -> None:
         patch("nodes.synthesize_output._publish_llm_response_event", new_callable=AsyncMock),
         patch("nodes.finalize_run._publish_run_event", new_callable=AsyncMock),
         patch("nodes.dispatch_next_task.httpx.AsyncClient", return_value=mock_http_client),
-        patch("nodes.record_result._db_engine", mock_db_engine),
-        patch("nodes.finalize_run._db_engine", mock_db_engine),
+        patch("nodes.dispatch_next_task.task_exists", new_callable=AsyncMock, return_value=True),
+        patch("nodes.decompose_query.insert_task_plan", new_callable=AsyncMock),
+        patch("nodes.record_result.get_db_engine", return_value=mock_db_engine),
+        patch("nodes.finalize_run.get_db_engine", return_value=mock_db_engine),
         patch("nodes.record_result.async_sessionmaker", return_value=MagicMock(return_value=mock_session)),
         patch("nodes.finalize_run.async_sessionmaker", return_value=MagicMock(return_value=mock_session)),
     ):
@@ -136,9 +138,9 @@ async def test_graph_run_agent_timeout_exhausts_retries() -> None:
         patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
         patch("nodes.finalize_run._publish_run_event", new_callable=AsyncMock),
         patch("nodes.dispatch_next_task.httpx.AsyncClient", return_value=mock_http_client),
-        patch("nodes.record_result._db_engine", None),
-        patch("nodes.finalize_run._db_engine", None),
-        patch("nodes.handle_error._db_engine", None),  # handle_error also checks
+        patch("nodes.decompose_query.insert_task_plan", new_callable=AsyncMock),
+        patch("nodes.record_result.get_db_engine", return_value=None),
+        patch("nodes.finalize_run.get_db_engine", return_value=None),
     ):
         from graph import build_graph
 

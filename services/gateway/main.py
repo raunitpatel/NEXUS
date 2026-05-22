@@ -21,7 +21,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from config import settings
 from middleware.auth import AuthMiddleware
 from middleware.rate_limit import RateLimitMiddleware
-from routers import auth, runs, sse
+from routers import auth, runs, sse, agents, memory, metrics
 
 from shared.logging import configure_logging
 from shared.telemetry import configure_telemetry
@@ -105,6 +105,9 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(runs.router, prefix="/api/v1/runs", tags=["runs"])
     app.include_router(sse.router, prefix="/api/v1/sse", tags=["sse"])
+    app.include_router(agents.router,  prefix="/api/v1/agents",  tags=["agents"])
+    app.include_router(memory.router,  prefix="/api/v1/memory",  tags=["memory"])
+    app.include_router(metrics.router, prefix="/api/v1/metrics", tags=["metrics"])
 
     @app.get("/healthz", tags=["health"])
     async def health_check() -> dict[str, str]:

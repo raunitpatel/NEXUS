@@ -10,14 +10,8 @@ that routing logic works even with stub implementations everywhere else.
 import structlog
 
 from state import OrchestratorState
-from sqlalchemy.ext.asyncio import AsyncEngine
-from nodes import _redis_client
+from nodes import get_redis_client
 from sse_emitter import emit_event
-
-_db_engine: AsyncEngine | None = None
-def set_db_engine(engine: AsyncEngine) -> None:
-    global _db_engine
-    _db_engine = engine
 
 logger = structlog.get_logger(__name__)
 
@@ -43,39 +37,18 @@ async def handle_error(state: OrchestratorState) -> OrchestratorState:
         retry_count=current_retry,
     )
 
-    # Insert error event row if DB is available
-    if _db_engine is not None:
-        try:
-            import json
-            from sqlalchemy import text
-            from sqlalchemy.ext.asyncio import async_sessionmaker
-            session_factory = async_sessionmaker(
-                bind=_db_engine,
-                expire_on_commit=False,
-                autoflush=False,
-            )
-            async with session_factory() as session:
-                await session.execute(
-                    text(
-                        """
-                        INSERT INTO events (run_id, type, payload, source)
-                        VALUES (:run_id, 'run_error', CAST(:payload AS jsonb), 'orchestrator.handle_error')
-                        """
-                    ),
-                    {
-                        "run_id": run_id,
-                        "payload": json.dumps({
-                            "error": error_msg,
-                            "retry_count": current_retry,
-                        }),
-                    },
-                )
-                await session.commit()
-        except Exception as exc:
-            logger.error("node.handle_error.db_error", run_id=run_id, error=str(exc))
+    # Event persistence is centralized in sse_emitter.emit_event(); this node
+    # only emits the run_error event for delivery and persistence.
     
     try:
-        if _redis_client is not None:
+        _redis_client = get_redis_client()
+        if _redis_client is None:
+            logger.error(
+                "dispach_next_task.redis_client_none",
+                run_id=run_id,
+                warning="SSE terminal event will NOT be delivered — _redis_client is None",
+            )
+        else:
             await emit_event(
                 run_id=run_id,
                 event_type="run_error",

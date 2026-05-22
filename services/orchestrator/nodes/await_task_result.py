@@ -19,7 +19,6 @@ from typing import Any
 import structlog
 
 from state import OrchestratorState, TaskResult
-from nodes import _redis_client
 
 logger = structlog.get_logger(__name__)
 

@@ -31,6 +31,14 @@ Write-Host "Running shared services tests..." -ForegroundColor Yellow
 python -m pytest services/shared/tests/test_telemetry.py -v --asyncio-mode=auto
 
 # =========================================================
+# Data Generation test
+# =========================================================
+Write-Host ""
+Write-Host "Running Data Generation tests..." -ForegroundColor Yellow
+
+python -m pytest data_gen/tests/test_simulate_runs.py -v --asyncio-mode=auto
+
+# =========================================================
 # Gateway service tests
 # =========================================================
 

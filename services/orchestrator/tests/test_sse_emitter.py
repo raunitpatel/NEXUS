@@ -233,8 +233,8 @@ async def test_sse_stream_generator_closes_after_terminal_event() -> None:
     async for _ in sse_stream_generator("r1", redis):
         count += 1
 
-    # Only the terminal event, generator returned
-    assert count == 1
+    # Should yield the initial stream-open handshake and then the terminal event
+    assert count == 2
     mock_pubsub.unsubscribe.assert_awaited()
     mock_pubsub.close.assert_awaited()
 

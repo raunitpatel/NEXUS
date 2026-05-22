@@ -19,7 +19,7 @@ import structlog
 from llm_provider import LLMProviderError, get_llm_provider
 from nodes.decompose_query import OrchestratorError
 from state import OrchestratorState, TaskResult
-from nodes import _redis_client
+from nodes import get_redis_client
 from sse_emitter import emit_event
  
 logger = structlog.get_logger(__name__)
@@ -98,7 +98,14 @@ async def synthesize_output(state: OrchestratorState) -> dict[str, Any]:
         raise OrchestratorError("LLM returned empty final_output during synthesis.")
     
     try:
-        if _redis_client is not None:
+        _redis_client = get_redis_client()
+        if _redis_client is None:
+            logger.error(
+                "finalize_run.redis_client_none",
+                run_id=run_id,
+                warning="SSE terminal event will NOT be delivered — _redis_client is None",
+            )
+        else:
             await emit_event(
                 run_id=run_id,
                 event_type="orchestrator_synthesize",

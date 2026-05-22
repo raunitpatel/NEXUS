@@ -18,17 +18,14 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from state import OrchestratorState
-from nodes import _redis_client
+from nodes import get_redis_client
 from sse_emitter import emit_event
 from shared.kafka_schemas import EventMessage
+from nodes.db import get_db_engine
 
 logger = structlog.get_logger(__name__)
 
-_db_engine: AsyncEngine | None = None
-
-def set_db_engine(engine: AsyncEngine) -> None:
-    global _db_engine
-    _db_engine = engine
+# Use shared engine accessor from nodes.db
 
 async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
     """
@@ -66,11 +63,12 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
         task_count=metadata["task_count"],
     )
 
-    # Update runs table
-    if _db_engine is not None:
+    # Update runs table using the shared engine
+    engine = get_db_engine()
+    if engine is not None:
         try:
             session_factory = async_sessionmaker(
-                bind=_db_engine,
+                bind=engine,
                 expire_on_commit=False,
                 autoflush=False,
             )
@@ -97,22 +95,8 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
                     },
                 )
 
-                # Insert events row
-                event_type = "run_complete" if terminal_status == "completed" else "run_error"
-                await session.execute(
-                    text(
-                        """
-                        INSERT INTO events (run_id, type, payload, source)
-                        VALUES (:run_id, :type, CAST(:payload AS jsonb), :source)
-                        """
-                    ),
-                    {
-                        "run_id": run_id,
-                        "type": event_type,
-                        "payload": json.dumps({"status": terminal_status, **metadata}),
-                        "source": "orchestrator.finalize_run",
-                    },
-                )
+                # Commit the runs table update. Event persistence is handled
+                # centrally by sse_emitter.emit_event() to avoid duplication.
                 await session.commit()
 
             logger.info("node.finalize_run.db_updated", run_id=run_id, status=terminal_status)
@@ -129,7 +113,14 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
     )
     
     try:
-        if _redis_client is not None:
+        _redis_client = get_redis_client()
+        if _redis_client is None:
+            logger.error(
+                "finalize_run.redis_client_none",
+                run_id=run_id,
+                warning="SSE terminal event will NOT be delivered — _redis_client is None",
+            )
+        else:
             event_type_sse = "run_complete" if terminal_status == "completed" else "run_error"
             await emit_event(
                 run_id=run_id,
@@ -142,6 +133,11 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
                     **metadata,
                 },
                 redis_client=_redis_client,
+            )
+            logger.info(
+                "finalize_run.sse_terminal_emitted",
+                run_id=run_id,
+                event_type=event_type_sse,
             )
     except Exception as _exc:
         logger.warning("finalize_run.emit_failed", run_id=run_id, error=str(_exc))

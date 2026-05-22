@@ -20,7 +20,8 @@ from pydantic import BaseModel, ValidationError, field_validator
 
 from llm_provider import LLMProviderError, get_llm_provider
 from state import AgentType, OrchestratorState, TaskPlan
-from nodes import _redis_client
+from nodes import get_redis_client
+from nodes.task_persistence import insert_task_plan
 from sse_emitter import emit_event
  
 logger = structlog.get_logger(__name__)
@@ -135,7 +136,14 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
         import redis.asyncio as _aioredis
         # Note: nodes don't have direct access to app.state — we use a module-level
         # redis client reference set by main.py lifespan (same pattern as _db_engine)
-        if _redis_client is not None:
+        _redis_client = get_redis_client()
+        if _redis_client is None:
+            logger.error(
+                "finalize_run.redis_client_none",
+                run_id=run_id,
+                warning="SSE terminal event will NOT be delivered — _redis_client is None",
+            )
+        else:
             await emit_event(
                 run_id=run_id,
                 event_type="run_start",
@@ -213,6 +221,8 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
         task_count=len(plan),
         agent_types=[t["agent_type"] for t in plan],
     )
+
+    await insert_task_plan(run_id=run_id, task_plan=plan)
  
     await _publish_thought_event(
         run_id=run_id,

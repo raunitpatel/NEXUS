@@ -59,19 +59,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         pool_pre_ping=True,
     )
 
-    from nodes.record_result import set_db_engine as set_record_db_engine
-    from nodes.finalize_run import set_db_engine as set_finalize_db_engine
-    from nodes.handle_error import set_db_engine as set_handle_error_db_engine
+    from nodes.db import set_db_engine as set_shared_db_engine
 
-    set_record_db_engine(engine)
-    set_finalize_db_engine(engine)
-    set_handle_error_db_engine(engine)
+    # Set the single shared DB engine for all orchestrator nodes
+    set_shared_db_engine(engine)
     app.state.db_engine = engine
 
     redis_client = aioredis.from_url(
         settings.redis_url,
         encoding="utf-8",
-        decode_responses=True,
+        decode_responses=False,
     )
     app.state.redis = redis_client
 
