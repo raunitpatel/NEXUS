@@ -32,13 +32,16 @@ export interface RegisterResponse {
 
 // ── Runs ──────────────────────────────────────────────────────────────────────
 
-export type RunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+export type RunStatus = | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled'
+export type AgentUsed = | 'Search Agent' | 'Code Agent' | 'Memory Agent' | 'Tool Agent'
 
 export interface Run {
   run_id: string
   status: RunStatus
   query: string
   created_at: string
+  duration_seconds?: number | null
+  agents_used?: AgentUsed[]
 }
 
 export interface CreateRunRequest {
