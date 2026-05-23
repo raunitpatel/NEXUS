@@ -23,13 +23,6 @@ interface NavItem {
 
 // ── Icons (inline SVGs matching design doc) ───────────────────────────────────
 
-const OrchestratorIcon = () => (
-  <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 flex-shrink-0">
-    <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5"/>
-    <polygon points="6,5 11,8 6,11" fill="currentColor"/>
-  </svg>
-)
-
 const DashboardIcon = () => (
   <svg viewBox="0 0 16 16" fill="none" className="w-4 h-4 flex-shrink-0">
     <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/>
@@ -91,12 +84,6 @@ const NexusIcon = () => (
 
 // ── Navigation config ─────────────────────────────────────────────────────────
 
-const PRIMARY_NAV: NavItem = {
-  label: 'Orchestrator',
-  href: '/orchestrator',
-  icon: <OrchestratorIcon />,
-}
-
 const WORKSPACE_NAV: NavItem[] = [
   { label: 'Dashboard',     href: '/dashboard',     icon: <DashboardIcon /> },
   { label: 'Runs',          href: '/runs',           icon: <RunsIcon /> },
@@ -120,8 +107,8 @@ export interface SidebarProps {
 /**
  * Persistent sidebar navigation for all authenticated NEXUS pages.
  *
- * Renders wordmark, primary action (Orchestrator), workspace nav, and
- * user footer with logout. Active route is highlighted via left border.
+ * Renders wordmark, workspace nav, and user footer with logout.
+ * Active route is highlighted via left border.
  */
 export function Sidebar({ displayName = 'User', initials = 'U' }: SidebarProps) {
   const pathname = usePathname()
@@ -156,14 +143,6 @@ export function Sidebar({ displayName = 'User', initials = 'U' }: SidebarProps) 
       {/* Navigation */}
       <nav className="flex-1 py-2 flex flex-col gap-px">
 
-        {/* Primary action — Orchestrator */}
-        <Link href={PRIMARY_NAV.href} className={navLinkClass(PRIMARY_NAV.href)}>
-          {PRIMARY_NAV.icon}
-          {PRIMARY_NAV.label}
-        </Link>
-
-        {/* Divider + section label */}
-        <div className="h-px bg-white/[0.06] my-[6px]" />
         <div className="px-4 py-1 text-[10px] font-bold text-white/25 uppercase tracking-[0.1em]">
           My workspace
         </div>

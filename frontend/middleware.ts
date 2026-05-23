@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 /** Protected route prefixes — middleware blocks unauthenticated access. */
 const PROTECTED_PREFIXES = [
   '/dashboard',
-  '/orchestrator',
   '/runs',
   '/history',
   '/memory',

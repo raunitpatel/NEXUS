@@ -42,6 +42,17 @@ export interface Run {
   created_at: string
   duration_seconds?: number | null
   agents_used?: AgentUsed[]
+  input_tokens?: number
+  output_tokens?: number
+  total_tokens?: number
+  latency_ms?: number | null
+}
+
+export interface RunListResponse {
+  runs: Run[]
+  total_count: number
+  page: number
+  size: number
 }
 
 export interface CreateRunRequest {

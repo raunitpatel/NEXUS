@@ -11,6 +11,7 @@
 import { useState } from 'react'
 import type { RunEvent, EventType } from '@/lib/types'
 import clsx from 'clsx'
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 
 interface EventCardProps {
   event: RunEvent
@@ -66,10 +67,13 @@ export function EventCard({ event, index }: EventCardProps) {
   // Extract human-readable content for display
   const payload = event.payload as Record<string, unknown>
   const content =
+    (payload.final_answer as string | undefined) ??
+    (payload.output as string | undefined) ??
+    (payload.response as string | undefined) ??
+    (payload.result as string | undefined) ??
     (payload.content as string | undefined) ??
     (payload.message as string | undefined) ??
-    (payload.error as string | undefined) ??
-    (typeof payload.output === 'string' ? payload.output : undefined)
+    (payload.error as string | undefined)
   const toolName =
     (payload.tool as string | undefined) ??
     (payload.agent_type as string | undefined)
@@ -101,8 +105,10 @@ export function EventCard({ event, index }: EventCardProps) {
           </div>
         )}
         {content && (
-          <span className="italic text-nexus-body">{content}</span>
-        )}
+            <div className="mt-2">
+              <MarkdownRenderer content={content} />
+            </div>
+          )}
       </div>
 
       {/* Expandable JSON payload */}

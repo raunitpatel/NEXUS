@@ -3,7 +3,7 @@
 
 /**
  * Authenticated app layout — renders Sidebar with decoded JWT user data.
- * All protected pages (dashboard, orchestrator, runs, etc.) use this layout.
+ * All protected pages (dashboard, runs, history, etc.) use this layout.
  */
 
 

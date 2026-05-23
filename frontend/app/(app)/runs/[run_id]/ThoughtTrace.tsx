@@ -16,6 +16,7 @@ import type { Run, RunEvent } from '@/lib/types'
 import { useSSEStream } from '@/hooks/useSSEStream'
 import { EventCard } from './EventCard'
 import { RunSummary } from './RunSummary'
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 
 interface ThoughtTraceProps {
   run: Run
@@ -33,7 +34,9 @@ function FinalAnswer({ output }: { output: string }) {
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4L12 3" stroke="#1D9E75" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
         Your answer
       </div>
-      <div className="text-[14px] text-nexus-dark leading-[1.8] whitespace-pre-wrap">{output}</div>
+      <div className="text-[14px] text-nexus-dark leading-[1.8]">
+        <MarkdownRenderer content={output} />
+      </div>
     </div>
   )
 }
@@ -55,7 +58,10 @@ export function ThoughtTrace({ run, initialEvents }: ThoughtTraceProps) {
     const terminalEvent = [...displayEvents]
       .reverse()
       .find((event) => event.event_type === 'run_complete')
-    const terminalOutput = terminalEvent?.payload?.output
+    const terminalOutput =
+      terminalEvent?.payload?.final_answer ??
+      terminalEvent?.payload?.output ??
+      terminalEvent?.payload?.response
     if (typeof terminalOutput === 'string' && terminalOutput.trim()) return terminalOutput
 
     const llmEvent = [...displayEvents]

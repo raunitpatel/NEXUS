@@ -18,20 +18,32 @@ import type { Run, RunEvent, RunStatus } from '@/lib/types'
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 async function fetchRun(runId: string, token: string): Promise<Run | null> {
-  let res: Response
   try {
-    res = await fetch(`${BASE_URL}/api/v1/runs/${encodeURIComponent(runId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: 'no-store',
-    })
-  } catch {
+    const res = await fetch(
+      `${BASE_URL}/api/v1/runs/${encodeURIComponent(runId)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        cache: 'no-store',
+      }
+    )
+
+    console.log('STATUS:', res.status)
+
+    const text = await res.text()
+
+    console.log('BODY:', text)
+
+    if (!res.ok) {
+      return null
+    }
+
+    return JSON.parse(text)
+  } catch (err) {
+    console.log('FETCH ERROR:', err)
     return null
   }
-
-  if (res.status === 404) return null
-  if (res.status === 401) redirect('/login?reason=expired')
-  if (!res.ok) return null
-  return res.json() as Promise<Run>
 }
 
 async function fetchEvents(runId: string, token: string): Promise<RunEvent[]> {
@@ -60,17 +72,17 @@ const STATUS_BADGE: Record<RunStatus, { label: string; bg: string; text: string 
 }
 
 interface RunDetailPageProps {
-  params: { run_id: string }
+  params: Promise<{ run_id: string }>
 }
 
 /**
  * Run detail server page — fetches run and events, renders ThoughtTrace.
  */
 export default async function RunDetailPage({ params }: RunDetailPageProps) {
-  const { run_id } = params
+    const { run_id } = await params
 
   // Read token from cookie (set by auth.ts setToken)
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('nexus_token')?.value
 
   if (!token) {

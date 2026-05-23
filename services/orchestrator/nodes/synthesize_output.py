@@ -110,7 +110,7 @@ async def synthesize_output(state: OrchestratorState) -> dict[str, Any]:
                 run_id=run_id,
                 event_type="orchestrator_synthesize",
                 agent_name="orchestrator.synthesize_output",
-                payload={"content": final_output[:500]},
+                payload={"content": final_output},
                 redis_client=_redis_client,
             )
     except Exception as _exc:
@@ -191,7 +191,7 @@ async def _publish_llm_response_event(run_id: str, final_output: str) -> None:
             run_id=run_id,
             event_type="llm_response",
             source="orchestrator.synthesize_output",
-            payload={"content": final_output[:2000]},
+            payload={"content": final_output},
         )
         await producer.send(
             settings.kafka_topic_events,

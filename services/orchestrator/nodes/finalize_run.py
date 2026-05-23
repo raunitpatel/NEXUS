@@ -128,7 +128,7 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
                 agent_name="orchestrator.finalize_run",
                 payload={
                     "status": terminal_status,
-                    "output": final_output[:500] if final_output else None,
+                    "output": final_output if final_output else None,
                     "error": error,
                     **metadata,
                 },
@@ -178,7 +178,7 @@ async def _publish_run_event(
             source="orchestrator.finalize_run",
             payload={
                 "status": terminal_status,
-                "output": final_output[:500] if final_output else None,
+                "output": final_output if final_output else None,
                 "error": error,
             },
         )
