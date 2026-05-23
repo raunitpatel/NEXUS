@@ -96,6 +96,13 @@ export interface RunEvent {
   created_at: string
 }
 
+export interface RunDetail extends Run {
+  output: string | null
+  error: string | null
+  metadata: Record<string, unknown>
+  completed_at: string | null
+}
+
 // ── Memory ────────────────────────────────────────────────────────────────────
 
 export interface MemorySearchResult {

@@ -58,6 +58,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             HTTP 429 JSONResponse if the limit is exceeded, otherwise the
             downstream response with X-RateLimit-* headers injected.
         """
+
+        if request.method == "OPTIONS":
+            return await call_next(request)
+    
         identifier = self._get_identifier(request)
         minute_epoch = int(time.time() //60)
         key = f"ratelimit:{identifier}:{minute_epoch}"

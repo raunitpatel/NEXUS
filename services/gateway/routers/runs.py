@@ -48,13 +48,40 @@ class RunSummary(BaseModel):
     Attributes:
         run_id: UUID of the run row.
         status: Current run lifecycle status.
-        query: The original user query (truncated to 200 chars in list view).
+        query: The original user query.
         created_at: ISO 8601 UTC timestamp string.
+        duration_seconds: total time to run.
+        agents_used: all agent called by orchestrator.
     """
 
     run_id: str
     status: str
     query: str
+    created_at: str
+    duration_seconds: int | None = None
+    agents_used: list[str] = []
+
+
+class RunEventSummary(BaseModel):
+    """
+    Event representation returned for a run thought trace.
+
+    Attributes:
+        event_id: UUID of the persisted event row.
+        run_id: UUID of the parent run.
+        task_id: Optional task UUID associated with the event.
+        event_type: Semantic event type stored in events.type.
+        source: Dotted source identifier for the emitter.
+        payload: JSON payload for the event body.
+        created_at: ISO timestamp string for display ordering.
+    """
+
+    event_id: str
+    run_id: str
+    task_id: str | None = None
+    event_type: str
+    source: str
+    payload: dict[str, Any] = Field(default_factory=dict)
     created_at: str
 
 
@@ -228,17 +255,38 @@ async def list_runs(
     user_id = current_user["user_id"]
 
     query_sql = """
-        SELECT
-            id::text        AS run_id,
-            status,
-            query,
-            created_at::text AS created_at
-        FROM runs
-        WHERE user_id = :user_id
-        {status_clause}
-        ORDER BY created_at DESC
-        LIMIT :limit OFFSET :offset
-    """
+                SELECT
+                    r.id::text AS run_id,
+                    r.status,
+                    r.query,
+                    r.created_at::text AS created_at,
+
+                    CASE
+                        WHEN r.completed_at IS NOT NULL THEN
+                            EXTRACT(EPOCH FROM (r.completed_at - r.created_at))::INT
+                        ELSE NULL
+                    END AS duration_seconds,
+
+                    COALESCE(
+                        ARRAY_AGG(DISTINCT a.name)
+                        FILTER (WHERE a.name IS NOT NULL),
+                        '{{}}'
+                    ) AS agents_used
+
+                FROM runs r
+                LEFT JOIN tasks t
+                    ON t.run_id = r.id
+                LEFT JOIN agents a
+                    ON a.id = t.agent_id
+
+                WHERE r.user_id = :user_id
+                {status_clause}
+
+                GROUP BY r.id
+
+                ORDER BY r.created_at DESC
+                LIMIT :limit OFFSET :offset
+            """
 
     params: dict[str, Any] = {
         "user_id": user_id,
@@ -263,13 +311,88 @@ async def list_runs(
             status=row.status,
             query=row.query[:200],
             created_at=row.created_at,
+            duration_seconds=row.duration_seconds,
+            agents_used=row.agents_used or [],
+        )
+        for row in rows
+    ]
+
+
+# ── GET /api/v1/runs/{run_id}/events ──────────────────────────────────────────
+
+@router.get(
+    "/{run_id}/events",
+    response_model=list[RunEventSummary],
+    summary="List thought-trace events for a run",
+)
+async def list_run_events(
+    run_id: str,
+    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    limit: int = Query(default=200, ge=1, le=500),
+) -> list[RunEventSummary]:
+    """
+    Return persisted events for a single run, enforcing ownership.
+
+    Events are persisted by the orchestrator SSE emitter. This endpoint lets
+    completed and failed run detail pages render historical thought traces
+    after the short-lived Redis SSE replay buffer has expired.
+    """
+    user_id = current_user["user_id"]
+
+    result = await db.execute(
+        text(
+            """
+            SELECT
+                e.id::text AS event_id,
+                e.run_id::text AS run_id,
+                e.task_id::text AS task_id,
+                e.type AS event_type,
+                e.source,
+                e.payload,
+                e.created_at::text AS created_at
+            FROM events e
+            INNER JOIN runs r
+                ON r.id = e.run_id
+            WHERE e.run_id = :run_id
+              AND r.user_id = :user_id
+            ORDER BY e.created_at ASC
+            LIMIT :limit
+            """
+        ),
+        {"run_id": run_id, "user_id": user_id, "limit": limit},
+    )
+    rows = result.fetchall()
+
+    # Keep the same "not found or not yours" behavior as GET /runs/{run_id}.
+    if not rows:
+        owner_check = await db.execute(
+            text("SELECT 1 FROM runs WHERE id = :run_id AND user_id = :user_id"),
+            {"run_id": run_id, "user_id": user_id},
+        )
+        if owner_check.fetchone() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Run {run_id} not found",
+            )
+
+    logger.info("runs.events.list", run_id=run_id, user_id=user_id, count=len(rows))
+
+    return [
+        RunEventSummary(
+            event_id=row.event_id,
+            run_id=row.run_id,
+            task_id=row.task_id,
+            event_type=row.event_type,
+            source=row.source,
+            payload=row.payload or {},
+            created_at=row.created_at,
         )
         for row in rows
     ]
 
 
 # ── GET /api/v1/runs/{run_id} ─────────────────────────────────────────────────
-
 
 @router.get(
     "/{run_id}",
@@ -305,17 +428,40 @@ async def get_run(
         text(
             """
             SELECT
-                id::text        AS run_id,
-                status,
-                query,
-                created_at::text AS created_at
-            FROM runs
-            WHERE id = :run_id
-              AND user_id = :user_id
+                r.id::text AS run_id,
+                r.status,
+                r.query,
+                r.created_at::text AS created_at,
+
+                CASE
+                    WHEN r.completed_at IS NOT NULL THEN
+                        EXTRACT(EPOCH FROM (r.completed_at - r.created_at))::INT
+                    ELSE NULL
+                END AS duration_seconds,
+
+                COALESCE(
+                    ARRAY_AGG(DISTINCT a.name)
+                    FILTER (WHERE a.name IS NOT NULL),
+                    '{{}}'
+                ) AS agents_used
+
+            FROM runs r
+
+            LEFT JOIN tasks t
+                ON t.run_id = r.id
+
+            LEFT JOIN agents a
+                ON a.id = t.agent_id
+
+            WHERE r.id = :run_id
+              AND r.user_id = :user_id
+
+            GROUP BY r.id
             """
         ),
         {"run_id": run_id, "user_id": user_id},
     )
+
     row = result.fetchone()
 
     if row is None:
@@ -331,4 +477,6 @@ async def get_run(
         status=row.status,
         query=row.query,
         created_at=row.created_at,
+        duration_seconds=row.duration_seconds,
+        agents_used=row.agents_used or [],
     )

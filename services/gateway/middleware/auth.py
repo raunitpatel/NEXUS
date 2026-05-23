@@ -55,6 +55,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """
         # Exempt paths bypass auth entirely
         path: str = request.url.path
+
+        # Always allow CORS preflight requests
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+
         if any(path.startswith(prefix) for prefix in _EXEMPT_PREFIXES):
             return await call_next(request)
         

@@ -84,6 +84,11 @@ def create_app() -> FastAPI:
         redoc_url=None,
     )
 
+    # JWT auth middleware - runs on every request except /api/v1/auth/* and /healthz
+    # Starlette executes middleware in reverse registration order.
+    app.add_middleware(RateLimitMiddleware)
+    app.add_middleware(AuthMiddleware)
+    
     # CORS - allow Next.js dev server and production Vercel origin
     app.add_middleware(
         CORSMiddleware,
@@ -93,10 +98,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # JWT auth middleware - runs on every request except /api/v1/auth/* and /healthz
-    # Starlette executes middleware in reverse registration order.
-    app.add_middleware(RateLimitMiddleware)
-    app.add_middleware(AuthMiddleware)
+    
 
     # Prometheus metric auto-instrumentation
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")

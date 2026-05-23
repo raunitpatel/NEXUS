@@ -98,8 +98,8 @@ def configure_telemetry(
         )
 
     # Console exporter for development visibility — disabled in production
-    if environment == "development":
-        provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
+    # if environment == "development":
+    #     provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
 
     trace.set_tracer_provider(provider)
 

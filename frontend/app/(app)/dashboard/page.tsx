@@ -18,6 +18,7 @@ import { StatusBadge } from '@/components/runs/StatusBadge'
 import { AgentsUsedBadge } from '@/components/runs/AgentsUsedBadge'
 import { NewRunModal } from './NewRunModal'
 import { useRuns } from '@/hooks/useRun'
+import { useMetricsSummary } from '@/hooks/useMetrics'
 import type { Run } from '@/lib/types'
 
 
@@ -26,22 +27,31 @@ export default function DashboardPage() {
   const [showModal, setShowModal] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const { runs, isLoading, isError, mutate } = useRuns({ limit: 10 })
+  const {
+    summary,
+    isLoading: isSummaryLoading,
+    mutate: mutateSummary,
+  } = useMetricsSummary()
 
   const activeRuns = runs.filter((r) => r.status === 'running')
-  const completedRuns = runs.filter((r) => r.status === 'completed')
-  const failedRuns = runs.filter((r) => r.status === 'failed')
-  const successRate =
-    runs.length > 0
-      ? Math.round((completedRuns.length / runs.length) * 100)
-      : 0
+  const recentCompletedRuns = runs.filter((r) => r.status === 'completed')
+  const recentFailedRuns = runs.filter((r) => r.status === 'failed')
+  const totalRuns = summary?.total_runs ?? runs.length
+  const activeRunCount = summary?.active_runs ?? activeRuns.length
+  const successfulRuns = summary?.successful_runs ?? recentCompletedRuns.length
+  const failedRunsCount = summary?.failed_runs ?? recentFailedRuns.length
+  const fallbackSuccessRate =
+    runs.length > 0 ? recentCompletedRuns.length / runs.length : 0
+  const successRate = Math.round((summary?.success_rate ?? fallbackSuccessRate) * 100)
 
   const handleRunSuccess = useCallback(
     (runId: string) => {
       setShowModal(false)
       mutate()
+      mutateSummary()
       router.push(`/runs/${runId}`)
     },
-    [mutate, router]
+    [mutate, mutateSummary, router]
   )
 
   useEffect(() => {
@@ -86,25 +96,25 @@ export default function DashboardPage() {
         <div className="grid grid-cols-4 gap-3 mb-[22px]">
           <MetricCard
             label="My total runs"
-            value={String(runs.length)}
-            sub={isLoading ? 'Loading…' : undefined}
+            value={String(totalRuns)}
+            sub={isSummaryLoading ? 'Loading…' : undefined}
           />
           <MetricCard
             label="Running now"
-            value={String(activeRuns.length)}
-            live={activeRuns.length > 0}
-            sub={activeRuns.length > 0 ? `${activeRuns.length} agent${activeRuns.length > 1 ? 's' : ''} active` : 'All idle'}
+            value={String(activeRunCount)}
+            live={activeRunCount > 0}
+            sub={activeRunCount > 0 ? `${activeRunCount} run${activeRunCount > 1 ? 's' : ''} active` : 'All idle'}
           />
           <MetricCard
             label="My success rate"
             value={`${successRate}%`}
-            sub={`${completedRuns.length} completed`}
+            sub={`${successfulRuns} completed`}
           />
           <MetricCard
             label="Failed"
-            value={String(failedRuns.length)}
-            sub="in current view"
-            valueColor={failedRuns.length > 0 ? 'text-nexus-error' : undefined}
+            value={String(failedRunsCount)}
+            sub="all time"
+            valueColor={failedRunsCount > 0 ? 'text-nexus-error' : undefined}
           />
         </div>
 
