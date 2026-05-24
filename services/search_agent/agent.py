@@ -191,7 +191,7 @@ class SearchAgent:
             run_id=run_id,
             task_id=task_id,
             event_type="agent_start",
-            payload={"query": query[:200], "agent": "search"},
+            payload={"query": query, "agent": "search"},
         )
 
         try:

@@ -148,7 +148,7 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
                 run_id=run_id,
                 event_type="run_start",
                 agent_name="orchestrator.decompose_query",
-                payload={"query": query[:200]},
+                payload={"query": query},
                 redis_client=_redis_client,
             )
     except Exception as _exc:
@@ -176,7 +176,7 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
         logger.error(
             "decompose_query.invalid_response",
             run_id=run_id,
-            raw_content=llm_response.content[:500],
+            raw_content=llm_response.content,
             error=str(exc),
         )
         raise OrchestratorError(

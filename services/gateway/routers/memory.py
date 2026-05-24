@@ -109,7 +109,7 @@ async def search_memory(
     current_user: Annotated[dict[str, str], Depends(get_current_user)],
     q: str = Query(..., min_length=1, max_length=500, description="Semantic search query"),
     limit: int = Query(default=10, ge=1, le=50),
-    similarity_threshold: float = Query(default=0.75, ge=0.0, le=1.0),
+    similarity_threshold: float = Query(default=0.35, ge=0.0, le=1.0),
 ) -> MemorySearchResponse:
     """
     Perform a semantic similarity search over the user's embedded run history.

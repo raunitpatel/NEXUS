@@ -161,7 +161,11 @@ def _format_task_results(completed_tasks: list[TaskResult]) -> str:
         if result.get("error"):
             lines.append(f"Error: {result['error']}")
         else:
-            output = result.get("output", {})
+            output = (
+                result.get("output")
+                or result.get("raw_response")
+                or {}
+            )
             # Serialize dict to JSON string so LLM sees clean structured data
             lines.append(json.dumps(output, indent=2) if output else "(empty output)")
         lines.append("")

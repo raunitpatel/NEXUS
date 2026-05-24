@@ -163,7 +163,7 @@ class ToolAgent:
             run_id=run_id,
             task_id=task_id,
             event_type="agent_start",
-            payload={"instruction": instruction[:200], "agent": "tool"},
+            payload={"instruction": instruction, "agent": "tool"},
         )
 
         # Step 1: Ask LLM which tool to call
@@ -200,7 +200,7 @@ class ToolAgent:
         # Step 2: If no tool call, return LLM's direct answer
         if tool_call.tool_name is None:
             elapsed = int((time.monotonic() - start_ms) * 1000)
-            logger.info("tool_agent.no_tool_called", run_id=run_id, raw_text=tool_call.raw_text[:100])
+            logger.info("tool_agent.no_tool_called", run_id=run_id, raw_text=tool_call.raw_text)
             result = ToolAgentResult(
                 answer=tool_call.raw_text or "I could not determine which tool to use.",
                 tool_used=None,

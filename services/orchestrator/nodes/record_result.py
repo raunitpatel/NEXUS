@@ -108,7 +108,11 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
                 engine=engine,
                 task_id=task_id,
                 status=db_status,
-                output=task_result.get("output"),
+                output={
+                        "output": task_result.get("output"),
+                        "summary": task_result.get("summary"),
+                        "raw_response": task_result.get("raw_response"),
+                    },
                 error=task_result.get("error"),
                 duration_ms=task_result.get("duration_ms", 0),
             )
@@ -149,6 +153,10 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
                     "agent_type": task_result.get("agent_type"),
                     "status": db_status,
                     "duration_ms": task_result.get("duration_ms", 0),
+                    "output": task_result.get("output"),
+                    "summary": task_result.get("summary"),
+                    "raw_response": task_result.get("raw_response"),
+                    "error": task_result.get("error"),
                 },
                 redis_client=_redis_client,
             )

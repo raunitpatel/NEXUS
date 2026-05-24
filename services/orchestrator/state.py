@@ -69,6 +69,8 @@ class TaskResult(TypedDict):
     error: str | None
     duration_ms: int
     attempt: int
+    raw_response: dict[str, Any]
+    summary: str
 
 
 class OrchestratorState(TypedDict):

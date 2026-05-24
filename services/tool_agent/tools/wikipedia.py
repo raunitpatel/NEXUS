@@ -106,6 +106,6 @@ class WikipediaTool:
             raise ValueError(f"No extract available for '{query}'")
 
         # Truncate to first 500 chars for Kafka payload size limits
-        summary = extract[:500].rsplit(".", 1)[0] + "." if len(extract) > 500 else extract
+        summary = extract.rsplit(".", 1)[0] + "." if len(extract) > 500 else extract
 
         return title, summary, page_url

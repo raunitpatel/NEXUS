@@ -155,7 +155,7 @@ class CodeAgent:
             run_id=run_id,
             task_id=task_id,
             event_type="agent_start",
-            payload={"instruction": instruction[:200], "agent": "code"},
+            payload={"instruction": instruction, "agent": "code"},
         )
 
         code = ""
@@ -230,10 +230,10 @@ class CodeAgent:
                 event_type="code_iteration",
                 payload={
                     "iteration": iteration,
-                    "code": code[:1000],  # truncate for Kafka payload size
+                    "code": code,  # truncate for Kafka payload size
                     "exit_code": execution.exit_code,
-                    "stdout": execution.stdout[:500],
-                    "stderr": execution.stderr[:500],
+                    "stdout": execution.stdout,
+                    "stderr": execution.stderr,
                 },
             )
 

@@ -3,12 +3,15 @@
 import type { RunStatus } from '@/lib/types'
 
 export type HistoryStatusFilter = RunStatus | ''
+export type HistoryAgentFilter = 'search' | 'code' | 'memory' | 'tool' | ''
 
 interface FilterBarProps {
   status: HistoryStatusFilter
+  agentFilter: HistoryAgentFilter
   startDate: string
   endDate: string
   onStatusChange: (status: HistoryStatusFilter) => void
+  onAgentFilterChange: (agent: HistoryAgentFilter) => void
   onStartDateChange: (value: string) => void
   onEndDateChange: (value: string) => void
 }
@@ -22,16 +25,26 @@ const STATUS_OPTIONS: Array<{ label: string; value: HistoryStatusFilter }> = [
   { label: 'Cancelled', value: 'cancelled' },
 ]
 
+const AGENT_OPTIONS: Array<{ label: string; value: HistoryAgentFilter }> = [
+  { label: 'All agents', value: '' },
+  { label: 'Search Agent', value: 'search' },
+  { label: 'Code Agent', value: 'code' },
+  { label: 'Memory Agent', value: 'memory' },
+  { label: 'Tool Agent', value: 'tool' },
+]
+
 export function FilterBar({
   status,
+  agentFilter,
   startDate,
   endDate,
   onStatusChange,
+  onAgentFilterChange,
   onStartDateChange,
   onEndDateChange,
 }: FilterBarProps) {
   return (
-    <div className="bg-white border-b border-black/[0.08] px-6 py-[11px] flex items-center gap-[10px] flex-shrink-0">
+    <div className="bg-white border-b border-black/[0.08] px-6 py-[11px] flex items-center gap-[10px] flex-shrink-0 flex-wrap">
       <label className="sr-only" htmlFor="history-status-filter">
         Status
       </label>
@@ -43,6 +56,22 @@ export function FilterBar({
       >
         {STATUS_OPTIONS.map((option) => (
           <option key={option.value || 'all'} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+
+      <label className="sr-only" htmlFor="history-agent-filter">
+        Agent
+      </label>
+      <select
+        id="history-agent-filter"
+        value={agentFilter}
+        onChange={(event) => onAgentFilterChange(event.target.value as HistoryAgentFilter)}
+        className="h-8 border border-black/[0.12] rounded-[6px] px-[10px] text-[12.5px] text-nexus-dark bg-white font-sans outline-none cursor-pointer focus:border-nexus-accent focus:shadow-[0_0_0_3px_rgba(83,74,183,0.12)]"
+      >
+        {AGENT_OPTIONS.map((option) => (
+          <option key={option.value || 'all-agents'} value={option.value}>
             {option.label}
           </option>
         ))}
