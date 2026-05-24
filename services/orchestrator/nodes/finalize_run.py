@@ -113,15 +113,24 @@ def _build_metadata(state: OrchestratorState, terminal_status: str) -> dict[str,
     # Deduplicated agent types in execution order
     seen: set[str] = set()
     agent_types_used: list[str] = []
+
     for t in completed_tasks:
         at = t.get("agent_type")
+
         if at and at not in seen:
             seen.add(at)
             agent_types_used.append(at)
 
+    # NEW: total run duration for analytics + charts
+    total_duration_ms = sum(
+        t.get("duration_ms", 0)
+        for t in completed_tasks
+    )
+
     return {
         "input_tokens": state.get("input_tokens", 0),
         "output_tokens": state.get("output_tokens", 0),
+        "duration_ms": total_duration_ms,
         "task_count": len(task_plan),
         "completed_task_count": len(completed_tasks),
         "retry_count": state.get("retry_count", 0),

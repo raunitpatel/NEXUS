@@ -173,7 +173,7 @@ async def get_summary(
             SELECT
                 COALESCE(SUM((metadata->>'input_tokens')::bigint), 0)   AS total_input_tokens,
                 COALESCE(SUM((metadata->>'output_tokens')::bigint), 0)  AS total_output_tokens,
-                COALESCE(AVG((metadata->>'latency_ms')::float), 0)      AS avg_run_duration_ms
+                COALESCE(AVG((metadata->>'duration_ms')::float), 0)      AS avg_run_duration_ms
             FROM runs
             WHERE user_id = :user_id
               AND status = 'completed'
@@ -372,10 +372,10 @@ async def get_latency(
             """
             SELECT
                 DATE(created_at AT TIME ZONE 'UTC')                             AS date,
-                COALESCE(AVG((metadata->>'latency_ms')::float), 0)              AS avg_duration_ms,
+                COALESCE(AVG((metadata->>'duration_ms')::float), 0)              AS avg_duration_ms,
                 COALESCE(
                     PERCENTILE_CONT(0.95) WITHIN GROUP (
-                        ORDER BY (metadata->>'latency_ms')::float
+                        ORDER BY (metadata->>'duration_ms')::float
                     ),
                     0
                 )                                                               AS p95_duration_ms,
@@ -383,7 +383,7 @@ async def get_latency(
             FROM runs
             WHERE user_id = :user_id
               AND status = 'completed'
-              AND metadata ? 'latency_ms'
+              AND metadata ? 'duration_ms'
               AND created_at >= NOW() - INTERVAL '1 day' * :days
             GROUP BY DATE(created_at AT TIME ZONE 'UTC')
             ORDER BY date ASC
