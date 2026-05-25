@@ -18,11 +18,10 @@ backwards-incompatible changes gracefully during rolling deploys.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-
 
 # Shared types
 
@@ -57,11 +56,12 @@ EventType = Literal[
     "memory_read",
     "memory_write",
     "llm_response",
-    "code_iteration"
+    "code_iteration",
 ]
 
 
 # nexus.tasks — orchestrator → agents
+
 
 class TaskDispatchedMessage(BaseModel):
     """
@@ -95,12 +95,11 @@ class TaskDispatchedMessage(BaseModel):
     input: dict[str, Any] = Field(default_factory=dict)
     attempt: int = 1
     timeout_seconds: int = 30
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 # nexus.results — agents → orchestrator
+
 
 class TaskResultMessage(BaseModel):
     """
@@ -131,18 +130,17 @@ class TaskResultMessage(BaseModel):
     task_id: str
     agent_type: AgentType
     status: TaskStatus
-    output: str = ""          # serialised agent output; empty string on failure
+    output: str = ""  # serialised agent output; empty string on failure
     error: str | None = None
     duration_ms: int = 0
     attempt: int = 1
     prompt_tokens: int = 0
     completion_tokens: int = 0
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 # nexus.events — orchestrator/agents → SSE emitter / Gateway
+
 
 class EventMessage(BaseModel):
     """
@@ -177,9 +175,7 @@ class EventMessage(BaseModel):
     event_type: EventType
     source: str
     payload: dict[str, Any] = Field(default_factory=dict)
-    created_at: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 # Convenience re-exports

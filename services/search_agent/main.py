@@ -9,17 +9,17 @@ Redis and Kafka producer are initialised at startup and stored on app.state.
 SearchAgent is instantiated per-request (stateless, takes redis from app.state).
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Annotated, Any, AsyncIterator
+from typing import Any
 
 import redis.asyncio as aioredis
 import structlog
+from agent import SearchAgent
+from config import settings
 from fastapi import FastAPI, Request
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-
-from agent import SearchAgent
-from config import settings
 from shared.kafka_client import KafkaProducerFactory
 from shared.logging import configure_logging
 from shared.metrics import configure_metrics
@@ -50,9 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Warm up Kafka producer connection at startup
     try:
-        await KafkaProducerFactory.get_producer(
-            bootstrap_servers=settings.kafka_bootstrap_servers
-        )
+        await KafkaProducerFactory.get_producer(bootstrap_servers=settings.kafka_bootstrap_servers)
         logger.info("search_agent.kafka_producer_ready")
     except Exception as exc:
         logger.warning("search_agent.kafka_unavailable", error=str(exc))
@@ -66,6 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 # ── Request / response models ─────────────────────────────────────────────────
+
 
 class RunRequest(BaseModel):
     """
@@ -102,6 +101,7 @@ class RunResponse(BaseModel):
 
 
 # ── App factory ───────────────────────────────────────────────────────────────
+
 
 def create_app() -> FastAPI:
     """

@@ -20,19 +20,18 @@ Authorization flow:
 from __future__ import annotations
 
 import json
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import httpx
 import redis.asyncio as aioredis
 import structlog
+from config import settings
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from jose import JWTError, jwt
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
-
-from config import settings
 from shared.metrics import sse_connections_active, sse_events_emitted_total
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -170,7 +169,9 @@ async def _proxy_stream(run_id: str) -> AsyncIterator[bytes]:
     logger.info("sse.proxy_open", run_id=run_id, orchestrator_url=orchestrator_url)
 
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=300.0, write=5.0, pool=5.0)) as client:
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(connect=5.0, read=300.0, write=5.0, pool=5.0)
+        ) as client:
             async with client.stream("GET", orchestrator_url) as response:
                 response.raise_for_status()
                 async for chunk in response.aiter_bytes():
@@ -200,16 +201,12 @@ async def _proxy_stream(run_id: str) -> AsyncIterator[bytes]:
 
     except httpx.ConnectError as exc:
         logger.error("sse.orchestrator_unreachable", run_id=run_id, error=str(exc))
-        error_event = (
-            'data: {"event_type":"error","payload":{"message":"Orchestrator stream unavailable"}}\n\n'
-        )
+        error_event = 'data: {"event_type":"error","payload":{"message":"Orchestrator stream unavailable"}}\n\n'
         yield error_event.encode("utf-8")
 
     except httpx.HTTPStatusError as exc:
         logger.error("sse.orchestrator_http_error", run_id=run_id, status=exc.response.status_code)
-        error_event = (
-            f'data: {{"event_type":"error","payload":{{"message":"Upstream error {exc.response.status_code}"}}}}\n\n'
-        )
+        error_event = f'data: {{"event_type":"error","payload":{{"message":"Upstream error {exc.response.status_code}"}}}}\n\n'
         yield error_event.encode("utf-8")
 
 
@@ -221,7 +218,9 @@ async def _proxy_stream(run_id: str) -> AsyncIterator[bytes]:
 async def stream_run(
     run_id: str,
     request: Request,
-    token: str = Query(..., description="JWT access token — required because EventSource cannot set headers"),
+    token: str = Query(
+        ..., description="JWT access token — required because EventSource cannot set headers"
+    ),
 ) -> StreamingResponse:
     """
     Proxy the Orchestrator's SSE stream for a single run to the browser.

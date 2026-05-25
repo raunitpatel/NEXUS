@@ -14,15 +14,14 @@ Endpoints:
 
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated
 
 import structlog
+from dependencies import get_current_user, get_db_session
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_current_user, get_db_session
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()

@@ -18,8 +18,7 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-
-from state import OrchestratorState, TaskResult
+from state import OrchestratorState
 
 logger = structlog.get_logger(__name__)
 
@@ -121,6 +120,7 @@ def _extract_summary(response_data: Any) -> str | None:
 
     return None
 
+
 async def await_task_result(state: OrchestratorState) -> dict[str, Any]:
     """
     Normalise the agent response stored in pending_task into a TaskResult.
@@ -162,8 +162,8 @@ async def await_task_result(state: OrchestratorState) -> dict[str, Any]:
         "task_id": task_id,
         "agent_type": agent_type,
         "output": normalized_output,
-        "raw_response": response_data,       # full response for debugging/traces
-        "summary": summary,                  # human-readable summary
+        "raw_response": response_data,  # full response for debugging/traces
+        "summary": summary,  # human-readable summary
         "error": agent_error,
         "duration_ms": elapsed_ms,
         "attempt": attempt,

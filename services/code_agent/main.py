@@ -9,16 +9,16 @@ Redis and Kafka producer are initialised at startup. CodeAgent is stateless and
 instantiated per-request.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
 import structlog
+from agent import CodeAgent
+from config import settings
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-
-from agent import CodeAgent
-from config import settings
 from shared.kafka_client import KafkaProducerFactory
 from shared.logging import configure_logging
 from shared.metrics import configure_metrics
@@ -41,9 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_metrics()
 
     try:
-        await KafkaProducerFactory.get_producer(
-            bootstrap_servers=settings.kafka_bootstrap_servers
-        )
+        await KafkaProducerFactory.get_producer(bootstrap_servers=settings.kafka_bootstrap_servers)
         logger.info("code_agent.kafka_producer_ready")
     except Exception as exc:
         logger.warning("code_agent.kafka_unavailable", error=str(exc))
@@ -56,6 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 
 # ── Request / response models ─────────────────────────────────────────────────
+
 
 class RunRequest(BaseModel):
     """
@@ -92,6 +91,7 @@ class RunResponse(BaseModel):
 
 
 # ── App factory ───────────────────────────────────────────────────────────────
+
 
 def create_app() -> FastAPI:
     """

@@ -14,7 +14,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from sse_emitter import (
     _TERMINAL_EVENTS,
     _format_sse,
@@ -22,8 +21,8 @@ from sse_emitter import (
     sse_stream_generator,
 )
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 def _mock_redis(
     done_value: str | None = None,
@@ -65,6 +64,7 @@ def _mock_pubsub(messages: list[dict]) -> AsyncMock:
 
 # ── _format_sse tests ──────────────────────────────────────────────────────────
 
+
 def test_format_sse_produces_correct_structure() -> None:
     """_format_sse produces W3C-compliant SSE string."""
     result = _format_sse("thought", {"content": "hello"}, 1)
@@ -82,6 +82,7 @@ def test_format_sse_ends_with_double_newline() -> None:
 
 
 # ── emit_event tests ───────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_emit_event_calls_publish_and_rpush() -> None:
@@ -156,12 +157,29 @@ async def test_emit_event_swallows_redis_error() -> None:
 
 # ── sse_stream_generator tests ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_sse_stream_generator_late_join_replays_buffered_events() -> None:
     """Generator replays buffered events and closes when run already done."""
     buffered = [
-        json.dumps({"event_type": "run_start", "payload": {}, "agent_name": "orchestrator", "run_id": "r1", "timestamp": 1.0}),
-        json.dumps({"event_type": "run_complete", "payload": {}, "agent_name": "orchestrator", "run_id": "r1", "timestamp": 2.0}),
+        json.dumps(
+            {
+                "event_type": "run_start",
+                "payload": {},
+                "agent_name": "orchestrator",
+                "run_id": "r1",
+                "timestamp": 1.0,
+            }
+        ),
+        json.dumps(
+            {
+                "event_type": "run_complete",
+                "payload": {},
+                "agent_name": "orchestrator",
+                "run_id": "r1",
+                "timestamp": 2.0,
+            }
+        ),
     ]
     redis = _mock_redis(done_value="run_complete", buffered_events=buffered)
 
@@ -177,21 +195,25 @@ async def test_sse_stream_generator_late_join_replays_buffered_events() -> None:
 @pytest.mark.asyncio
 async def test_sse_stream_generator_yields_sse_formatted_events() -> None:
     """Generator yields properly formatted SSE strings from pub/sub messages."""
-    event_payload = json.dumps({
-        "event_type": "thought",
-        "payload": {"content": "planning"},
-        "agent_name": "orchestrator.decompose_query",
-        "run_id": "r1",
-        "timestamp": 1.0,
-    }).encode()
+    event_payload = json.dumps(
+        {
+            "event_type": "thought",
+            "payload": {"content": "planning"},
+            "agent_name": "orchestrator.decompose_query",
+            "run_id": "r1",
+            "timestamp": 1.0,
+        }
+    ).encode()
 
-    terminal_payload = json.dumps({
-        "event_type": "run_complete",
-        "payload": {},
-        "agent_name": "orchestrator.finalize_run",
-        "run_id": "r1",
-        "timestamp": 2.0,
-    }).encode()
+    terminal_payload = json.dumps(
+        {
+            "event_type": "run_complete",
+            "payload": {},
+            "agent_name": "orchestrator.finalize_run",
+            "run_id": "r1",
+            "timestamp": 2.0,
+        }
+    ).encode()
 
     messages = [
         {"type": "message", "data": event_payload},
@@ -216,13 +238,15 @@ async def test_sse_stream_generator_yields_sse_formatted_events() -> None:
 @pytest.mark.asyncio
 async def test_sse_stream_generator_closes_after_terminal_event() -> None:
     """Generator stops yielding after run_complete event."""
-    terminal_payload = json.dumps({
-        "event_type": "run_complete",
-        "payload": {},
-        "agent_name": "orchestrator.finalize_run",
-        "run_id": "r1",
-        "timestamp": 1.0,
-    }).encode()
+    terminal_payload = json.dumps(
+        {
+            "event_type": "run_complete",
+            "payload": {},
+            "agent_name": "orchestrator.finalize_run",
+            "run_id": "r1",
+            "timestamp": 1.0,
+        }
+    ).encode()
 
     messages = [{"type": "message", "data": terminal_payload}]
     redis = _mock_redis()

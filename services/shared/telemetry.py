@@ -1,20 +1,20 @@
 """
 OpenTelemetry tracing configuration for all NEXUS services.
- 
+
 Every service calls configure_telemetry() once at startup (inside the lifespan
 context manager). After that call, the service emits OTLP spans to the Jaeger
 collector running at JAEGER_ENDPOINT (default: http://jaeger:4317).
- 
+
 Traces can be viewed in the Jaeger UI at http://localhost:16686.
- 
+
 Usage (in each service's main.py lifespan):
     from shared.telemetry import configure_telemetry
     configure_telemetry(service_name="gateway", environment="development")
- 
+
 The tracer is then obtained anywhere in the service via:
     from opentelemetry import trace
     tracer = trace.get_tracer(__name__)
- 
+
     with tracer.start_as_current_span("my_operation") as span:
         span.set_attribute("user.id", user_id)
         result = await do_work()
@@ -22,21 +22,19 @@ The tracer is then obtained anywhere in the service via:
 
 import logging
 import os
-from typing import Optional
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.propagate import set_global_textmap
 from opentelemetry.propagators.b3 import B3MultiFormat
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-from opentelemetry.semconv.resource import ResourceAttributes
-
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 # W3C Trace Context propagator — injects traceparent header into outgoing HTTP requests
 from opentelemetry.propagators.composite import CompositePropagator
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.semconv.resource import ResourceAttributes
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 _DEFAULT_JAEGER_ENDPOINT = "http://jaeger:4317"
@@ -47,19 +45,19 @@ logger = logging.getLogger(__name__)
 def configure_telemetry(
     service_name: str,
     environment: str = "development",
-    jaeger_endpoint: Optional[str] = None,
-    app: Optional[object] = None,
+    jaeger_endpoint: str | None = None,
+    app: object | None = None,
 ) -> None:
     """
     Configure OpenTelemetry tracing with a Jaeger OTLP exporter.
- 
+
     Sets up a TracerProvider with BatchSpanProcessor → OTLPSpanExporter.
     Registers W3CTraceContextPropagator as the global propagator so that
     outgoing httpx requests automatically carry 'traceparent' headers.
     Instruments FastAPI (if app is provided) and asyncpg (if installed).
- 
+
     Falls back gracefully if Jaeger is unreachable — service always starts.
- 
+
     Args:
         service_name: Logical name for this service in Jaeger (e.g. "gateway").
         environment: Deployment environment tag ("development" or "production").
@@ -68,9 +66,8 @@ def configure_telemetry(
         app: FastAPI application instance. If provided, FastAPIInstrumentor is
              applied to auto-instrument all routes. Pass app after it is created.
     """
-    endpoint: str = (
-        jaeger_endpoint
-        or os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", _DEFAULT_JAEGER_ENDPOINT)
+    endpoint: str = jaeger_endpoint or os.environ.get(
+        "OTEL_EXPORTER_OTLP_ENDPOINT", _DEFAULT_JAEGER_ENDPOINT
     )
 
     resource = Resource.create(
@@ -107,10 +104,12 @@ def configure_telemetry(
     # Set W3C Trace Context as global propagator so outgoing httpx requests
     # and incoming FastAPI requests share the same trace_id automatically.
     set_global_textmap(
-        CompositePropagator([
-            TraceContextTextMapPropagator(),  # W3C traceparent / tracestate
-            B3MultiFormat(),                   # B3 headers for legacy systems
-        ])
+        CompositePropagator(
+            [
+                TraceContextTextMapPropagator(),  # W3C traceparent / tracestate
+                B3MultiFormat(),  # B3 headers for legacy systems
+            ]
+        )
     )
 
     # Instrument asyncpg — creates DB query child spans automatically.
@@ -118,6 +117,7 @@ def configure_telemetry(
     # (some use SQLAlchemy async which has its own instrumentor).
     try:
         from opentelemetry.instrumentation.asyncpg import AsyncPGInstrumentor
+
         AsyncPGInstrumentor().instrument()
         logger.info("telemetry.asyncpg_instrumented", extra={"service": service_name})
     except ImportError:
@@ -135,6 +135,7 @@ def configure_telemetry(
     # including dispatch_next_task.py calls to agent services.
     try:
         from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+
         HTTPXClientInstrumentor().instrument()
         logger.info("telemetry.httpx_instrumented", extra={"service": service_name})
     except ImportError:

@@ -20,18 +20,16 @@ import json
 import time
 from typing import Any
 
-from shared.metrics import (
-    agent_task_duration_seconds,
-    agent_tasks_total,
-    llm_tokens_total,
-    llm_requests_total,
-)
-
 import structlog
-
 from cached_llm_provider import CachedLLMProvider
 from config import settings
 from llm_provider import LLMProviderError, get_llm_provider
+from shared.metrics import (
+    agent_task_duration_seconds,
+    agent_tasks_total,
+    llm_requests_total,
+    llm_tokens_total,
+)
 from tools.web_search import SearchResult, WebSearchTool
 
 logger = structlog.get_logger(__name__)
@@ -217,7 +215,9 @@ class SearchAgent:
             logger.error("search_agent.llm_error", run_id=run_id, task_id=task_id, error=str(exc))
             elapsed = int((time.monotonic() - start_ms) * 1000)
 
-            agent_task_duration_seconds.labels(agent="search", status="error").observe(elapsed / 1000)
+            agent_task_duration_seconds.labels(agent="search", status="error").observe(
+                elapsed / 1000
+            )
             agent_tasks_total.labels(agent="search", status="error").inc()
 
             result = SearchAgentResult(
@@ -284,7 +284,9 @@ class SearchAgent:
         )
         formulated = response.content.strip().strip('"')
         tokens = response.prompt_tokens + response.completion_tokens
-        logger.debug("search_agent.formulate_query", formulated=formulated, cache_hit=response.cache_hit)
+        logger.debug(
+            "search_agent.formulate_query", formulated=formulated, cache_hit=response.cache_hit
+        )
         return formulated, tokens, response.cache_hit
 
     async def _rerank(
@@ -303,13 +305,9 @@ class SearchAgent:
             Tuple of (sorted_results_high_to_low, tokens_used, cache_hit).
         """
         results_text = "\n".join(
-            f"[{i}] Title: {r['title']}\nSnippet: {r['snippet']}"
-            for i, r in enumerate(results)
+            f"[{i}] Title: {r['title']}\nSnippet: {r['snippet']}" for i, r in enumerate(results)
         )
-        user_msg = (
-            f"Original query: {original_query}\n\n"
-            f"Search results to rank:\n{results_text}"
-        )
+        user_msg = f"Original query: {original_query}\n\nSearch results to rank:\n{results_text}"
         response = await self._cached_provider.complete(
             system=_RERANK_SYSTEM,
             user=user_msg,
@@ -349,8 +347,7 @@ class SearchAgent:
         """
         top_results = ranked_results[:3]
         results_text = "\n".join(
-            f"[{i+1}] {r['title']}: {r['snippet']}"
-            for i, r in enumerate(top_results)
+            f"[{i + 1}] {r['title']}: {r['snippet']}" for i, r in enumerate(top_results)
         )
         user_msg = (
             f"User query: {original_query}\n\n"

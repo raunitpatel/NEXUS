@@ -12,8 +12,8 @@ import json
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
-
 from state import TaskPlan
+
 from nodes.db import get_db_engine
 
 logger = structlog.get_logger(__name__)

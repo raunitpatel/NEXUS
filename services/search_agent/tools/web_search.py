@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import asyncio
@@ -13,6 +12,7 @@ logger = structlog.get_logger(__name__)
 
 # Shared Result Schema
 
+
 class SearchResult(TypedDict):
     title: str
     url: str
@@ -22,8 +22,8 @@ class SearchResult(TypedDict):
 
 # Base Provider Interface
 
-class BaseSearchProvider(ABC):
 
+class BaseSearchProvider(ABC):
     @abstractmethod
     async def search(
         self,
@@ -34,8 +34,8 @@ class BaseSearchProvider(ABC):
 
 # Tavily Provider
 
-class TavilySearchProvider(BaseSearchProvider):
 
+class TavilySearchProvider(BaseSearchProvider):
     def __init__(
         self,
         api_key: str,
@@ -69,7 +69,6 @@ class TavilySearchProvider(BaseSearchProvider):
         async with httpx.AsyncClient(
             timeout=15.0,
         ) as client:
-
             response = await client.post(
                 self._url,
                 json=payload,
@@ -82,7 +81,6 @@ class TavilySearchProvider(BaseSearchProvider):
         results: list[SearchResult] = []
 
         for item in data.get("results", []):
-
             results.append(
                 {
                     "title": item.get("title", ""),
@@ -104,8 +102,8 @@ class TavilySearchProvider(BaseSearchProvider):
 
 # Mock Provider
 
-class MockSearchProvider(BaseSearchProvider):
 
+class MockSearchProvider(BaseSearchProvider):
     def __init__(
         self,
         max_results: int = 5,
@@ -174,7 +172,9 @@ class MockSearchProvider(BaseSearchProvider):
 
         return results[: self._max_results]
 
+
 # Main Tool Wrapper
+
 
 class WebSearchTool:
     """
@@ -214,9 +214,7 @@ class WebSearchTool:
                 max_results=max_results,
             )
 
-        raise ValueError(
-            f"Unsupported provider: {provider}"
-        )
+        raise ValueError(f"Unsupported provider: {provider}")
 
     async def search(
         self,

@@ -11,13 +11,12 @@ Session validation is two-factor:
 """
 
 import structlog
+from config import settings
 from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
-
-from config import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -27,8 +26,9 @@ _EXEMPT_PREFIXES: tuple[str, ...] = (
     "/metrics",
     "/docs",
     "/openapi.json",
-    "/api/v1/sse/"
+    "/api/v1/sse/",
 )
+
 
 class AuthMiddleware(BaseHTTPMiddleware):
     """
@@ -42,7 +42,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         """Initialise middleware with the ASGI app."""
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next:object) -> Response:
+    async def dispatch(self, request: Request, call_next: object) -> Response:
         """
         Intercept every request to validate auth before forwarding.
 
@@ -60,10 +60,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-
         if any(path.startswith(prefix) for prefix in _EXEMPT_PREFIXES):
             return await call_next(request)
-        
+
         # Extract Bearer token
         authorization: str | None = request.headers.get("Authorization")
         if not authorization or not authorization.startswith("Bearer "):
@@ -72,7 +71,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Not authenticated"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         token: str = authorization.removeprefix("Bearer ").strip()
 
         # Validate JWT signature and expiry
@@ -89,7 +88,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Invalid token or expired token"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         jti: str | None = payload.get("jti")
         user_id: str | None = payload.get("sub")
 
@@ -100,7 +99,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Invalid token claims"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         # Validate session exists in Redis (catches revoked tokens)
         try:
             redis = request.app.state.redis
@@ -111,7 +110,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 status_code=503,
                 content={"detail": "Authentication service unavailable"},
             )
-        
+
         if not session_exists:
             logger.info("auth.session_not_found", path=path, jti=jti)
             return JSONResponse(
@@ -119,7 +118,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 content={"detail": "Session expired or revoked"},
                 headers={"WWW-Authenticate": "Bearer"},
             )
-        
+
         # Inject current_user into request.state for downstream route handlers
         request.state.current_user = {"user_id": user_id, "jti": jti}
         return await call_next(request)

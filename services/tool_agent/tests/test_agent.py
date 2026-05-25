@@ -15,11 +15,10 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from llm_provider import LLMResponse, ToolCallResult, get_tool_definitions
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 def _tool_call_result(
     tool_name: str | None = "calculator",
@@ -38,11 +37,16 @@ def _tool_call_result(
     )
 
 
-def _llm_response(content: str, prompt_tokens: int = 50, completion_tokens: int = 20) -> LLMResponse:
-    return LLMResponse(content=content, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+def _llm_response(
+    content: str, prompt_tokens: int = 50, completion_tokens: int = 20
+) -> LLMResponse:
+    return LLMResponse(
+        content=content, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+    )
 
 
 # ── get_tool_definitions tests ────────────────────────────────────────────────
+
 
 def test_get_tool_definitions_returns_three_tools() -> None:
     """get_tool_definitions() returns exactly 3 tool dicts."""
@@ -69,10 +73,12 @@ def test_get_tool_definitions_names_match_schema() -> None:
 
 # ── CalculatorTool tests ──────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_calculator_basic_multiplication() -> None:
     """CalculatorTool returns correct result for multiplication."""
     from tools.calculator import CalculatorTool
+
     result = await CalculatorTool().run("137 * 42")
     assert result["result"] == 5754
     assert result["expression"] == "137 * 42"
@@ -82,6 +88,7 @@ async def test_calculator_basic_multiplication() -> None:
 async def test_calculator_complex_expression() -> None:
     """CalculatorTool handles parentheses and order of operations."""
     from tools.calculator import CalculatorTool
+
     result = await CalculatorTool().run("(100 + 50) / 3")
     assert abs(result["result"] - 50.0) < 0.001
 
@@ -90,6 +97,7 @@ async def test_calculator_complex_expression() -> None:
 async def test_calculator_division_by_zero() -> None:
     """CalculatorTool returns error dict on division by zero."""
     from tools.calculator import CalculatorTool
+
     result = await CalculatorTool().run("10 / 0")
     assert "error" in result
     assert "zero" in result["error"].lower()
@@ -99,6 +107,7 @@ async def test_calculator_division_by_zero() -> None:
 async def test_calculator_invalid_expression() -> None:
     """CalculatorTool returns error dict on invalid input."""
     from tools.calculator import CalculatorTool
+
     result = await CalculatorTool().run("import os")
     assert "error" in result
 
@@ -107,12 +116,14 @@ async def test_calculator_invalid_expression() -> None:
 async def test_calculator_returns_int_for_whole_numbers() -> None:
     """CalculatorTool returns int (not float) for whole number results."""
     from tools.calculator import CalculatorTool
+
     result = await CalculatorTool().run("10 * 10")
     assert result["result"] == 100
     assert isinstance(result["result"], int)
 
 
 # ── WeatherTool tests ─────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_weather_tool_returns_temperature() -> None:
@@ -169,6 +180,7 @@ async def test_weather_tool_city_not_found() -> None:
 
 # ── WikipediaTool tests ───────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_wikipedia_tool_returns_summary() -> None:
     """WikipediaTool returns dict with title and summary."""
@@ -215,6 +227,7 @@ async def test_wikipedia_tool_api_error_returns_error_dict() -> None:
 
 # ── ToolAgent.run() tests ─────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_tool_agent_calculator_end_to_end() -> None:
     """ToolAgent.run() with calculator instruction returns answer with result."""
@@ -232,12 +245,17 @@ async def test_tool_agent_calculator_end_to_end() -> None:
         patch("agent.get_llm_provider", return_value=mock_provider),
         patch("agent.ToolAgent._persist_tool_result", new_callable=AsyncMock),
         patch("agent.ToolAgent._publish_event", new_callable=AsyncMock),
-        patch("agent.CalculatorTool.run", new_callable=AsyncMock,
-              return_value={"result": 5754, "expression": "137 * 42"}),
+        patch(
+            "agent.CalculatorTool.run",
+            new_callable=AsyncMock,
+            return_value={"result": 5754, "expression": "137 * 42"},
+        ),
     ):
         agent = ToolAgent(db_engine=None)
         result = await agent.run(
-            task_id="t1", run_id="r1", user_id="u1",
+            task_id="t1",
+            run_id="r1",
+            user_id="u1",
             instruction="What is 137 * 42?",
         )
 
@@ -266,7 +284,9 @@ async def test_tool_agent_no_tool_call_returns_direct_answer() -> None:
     ):
         agent = ToolAgent(db_engine=None)
         result = await agent.run(
-            task_id="t1", run_id="r1", user_id="u1",
+            task_id="t1",
+            run_id="r1",
+            user_id="u1",
             instruction="Say hello world.",
         )
 
@@ -292,7 +312,9 @@ async def test_tool_agent_llm_dispatch_failure_returns_error() -> None:
     ):
         agent = ToolAgent(db_engine=None)
         result = await agent.run(
-            task_id="t1", run_id="r1", user_id="u1",
+            task_id="t1",
+            run_id="r1",
+            user_id="u1",
             instruction="What is 2 + 2?",
         )
 
@@ -320,8 +342,11 @@ async def test_tool_agent_db_persist_called_with_correct_args() -> None:
         patch("agent.get_llm_provider", return_value=mock_provider),
         patch("agent.ToolAgent._persist_tool_result", side_effect=capture_persist),
         patch("agent.ToolAgent._publish_event", new_callable=AsyncMock),
-        patch("agent.CalculatorTool.run", new_callable=AsyncMock,
-              return_value={"result": 4, "expression": "2 + 2"}),
+        patch(
+            "agent.CalculatorTool.run",
+            new_callable=AsyncMock,
+            return_value={"result": 4, "expression": "2 + 2"},
+        ),
     ):
         agent = ToolAgent(db_engine=None)
         await agent.run(
@@ -356,8 +381,7 @@ async def test_tool_agent_publishes_agent_start_and_end() -> None:
         patch("agent.get_llm_provider", return_value=mock_provider),
         patch("agent.ToolAgent._persist_tool_result", new_callable=AsyncMock),
         patch("agent.ToolAgent._publish_event", side_effect=capture_event),
-        patch("agent.CalculatorTool.run", new_callable=AsyncMock,
-              return_value={"result": 2}),
+        patch("agent.CalculatorTool.run", new_callable=AsyncMock, return_value={"result": 2}),
     ):
         agent = ToolAgent(db_engine=None)
         await agent.run(task_id="t1", run_id="r1", user_id="u1", instruction="1 + 1?")
@@ -371,7 +395,6 @@ async def test_tool_agent_unknown_tool_returns_error_in_output() -> None:
     """ToolAgent._execute_tool() returns error dict for unknown tool name."""
     from agent import ToolAgent
 
-    mock_provider = AsyncMock()
     agent = ToolAgent(db_engine=None)
     result = await agent._execute_tool("nonexistent_tool", {})
     assert "error" in result
@@ -380,17 +403,25 @@ async def test_tool_agent_unknown_tool_returns_error_in_output() -> None:
 
 # ── main.py endpoint tests ────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_run_endpoint_missing_instruction_returns_error() -> None:
     """POST /run with empty input.instruction returns error."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
-        response = client.post("/run", json={
-            "run_id": "r1", "task_id": "t1", "user_id": "u1",
-            "task_type": "tool", "input": {}, "attempt": 1,
-        })
+        response = client.post(
+            "/run",
+            json={
+                "run_id": "r1",
+                "task_id": "t1",
+                "user_id": "u1",
+                "task_type": "tool",
+                "input": {},
+                "attempt": 1,
+            },
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -401,8 +432,8 @@ async def test_run_endpoint_missing_instruction_returns_error() -> None:
 @pytest.mark.asyncio
 async def test_tools_endpoint_returns_three_tools() -> None:
     """GET /tools returns list of 3 tool definitions."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
         response = client.get("/tools")
@@ -417,8 +448,8 @@ async def test_tools_endpoint_returns_three_tools() -> None:
 @pytest.mark.asyncio
 async def test_healthz_returns_ok() -> None:
     """GET /healthz returns 200 with status ok."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
         response = client.get("/healthz")

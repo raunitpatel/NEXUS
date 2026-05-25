@@ -15,19 +15,18 @@ Response headers added on every non-429 response:
   X-RateLimit-Remaining: requests remaining in current window
 """
 
-import math
 import time
 from typing import Any
 
 import structlog
+from config import settings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.types import ASGIApp
 
-from config import settings
-
 logger = structlog.get_logger(__name__)
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
@@ -61,9 +60,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
 
         if request.method == "OPTIONS":
             return await call_next(request)
-    
+
         identifier = self._get_identifier(request)
-        minute_epoch = int(time.time() //60)
+        minute_epoch = int(time.time() // 60)
         key = f"ratelimit:{identifier}:{minute_epoch}"
 
         try:
@@ -80,7 +79,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             )
             # Fail open: pass the request through
             return await call_next(request)
-        
+
         remaining = max(0, self._limit - count)
 
         if count > self._limit:
@@ -103,12 +102,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                     "Retry-After": str(retry_after),
                 },
             )
-        
+
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(self._limit)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
         return response
-    
+
     def _get_identifier(self, request: Request) -> str:
         """
         Extract the rate limit identifier from the request.
@@ -123,9 +122,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         Returns:
             A string identifier unique to the requester.
         """
-        current_user: dict[str, str] | None = getattr(
-            request.state, "current_user", None
-        )
+        current_user: dict[str, str] | None = getattr(request.state, "current_user", None)
         if current_user:
             return current_user["user_id"]
 

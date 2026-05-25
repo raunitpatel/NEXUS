@@ -7,6 +7,7 @@ No other file in this service may call os.getenv directly.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     """
     Orchestrator service settings loaded from environment variables.
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # Application 
+    # Application
     environment: str = "development"
     log_level: str = "info"
     service_name: str = "orchestrator"
@@ -76,5 +77,6 @@ class Settings(BaseSettings):
 
     # Observability
     otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
+
 
 settings = Settings()

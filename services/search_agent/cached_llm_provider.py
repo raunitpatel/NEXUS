@@ -26,7 +26,6 @@ from dataclasses import dataclass
 
 import redis.asyncio as aioredis
 import structlog
-
 from llm_provider import LLMProvider, LLMResponse
 
 logger = structlog.get_logger(__name__)
@@ -145,11 +144,13 @@ class CachedLLMProvider:
 
         # Cache write
         try:
-            payload = json.dumps({
-                "content": response.content,
-                "prompt_tokens": response.prompt_tokens,
-                "completion_tokens": response.completion_tokens,
-            })
+            payload = json.dumps(
+                {
+                    "content": response.content,
+                    "prompt_tokens": response.prompt_tokens,
+                    "completion_tokens": response.completion_tokens,
+                }
+            )
             await self._redis.set(cache_key, payload, ex=self._ttl)
             logger.debug("llm_cache.written", cache_key=cache_key, ttl=self._ttl)
         except Exception as exc:

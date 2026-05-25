@@ -16,14 +16,19 @@ from __future__ import annotations
 from typing import Any
 
 import structlog
-
 from state import OrchestratorState
 
 logger = structlog.get_logger(__name__)
 
-_VALID_AGENT_TYPES = frozenset({
-    "search", "code", "memory_read", "memory_write", "tool",
-})
+_VALID_AGENT_TYPES = frozenset(
+    {
+        "search",
+        "code",
+        "memory_read",
+        "memory_write",
+        "tool",
+    }
+)
 
 
 def _detect_cycle(adjacency: dict[int, list[int]]) -> bool:
@@ -112,10 +117,7 @@ async def validate_plan(state: OrchestratorState) -> dict[str, Any]:
                 msg = f"Task {i} depends_on contains non-integer value '{dep}'."
                 return {"error": msg, "status": "failed"}
             if dep_idx < 0 or dep_idx >= n:
-                msg = (
-                    f"Task {i} depends_on index {dep_idx} is out of range "
-                    f"(plan has {n} tasks)."
-                )
+                msg = f"Task {i} depends_on index {dep_idx} is out of range (plan has {n} tasks)."
                 return {"error": msg, "status": "failed"}
             if dep_idx == i:
                 msg = f"Task {i} has a self-dependency."

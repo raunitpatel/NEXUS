@@ -1,16 +1,16 @@
 """
 Structured JSON logging configuration for all NEXUS services.
- 
+
 Every service calls configure_logging() once at startup (inside the lifespan
 context manager) before any log statements are emitted. After that call,
 all structlog loggers in that process emit newline-delimited JSON — one object
 per log event — ready for ingestion by Datadog, Grafana Loki, or Railway's
 log drain.
- 
+
 Usage (in each service's main.py lifespan):
     from shared.logging import configure_logging
     configure_logging(level=settings.log_level)
- 
+
 Then anywhere in the service:
     import structlog
     logger = structlog.get_logger(__name__)
@@ -23,14 +23,15 @@ from typing import Any
 
 import structlog
 
+
 def configure_logging(level: str = "INFO") -> None:
     """
     Configure structlog for JSON output across the entire service process.
- 
+
     Sets up a shared processor chain used by both structlog loggers and the
     standard-library logging bridge so that third-party libraries (SQLAlchemy,
     uvicorn, httpx) also emit structured JSON.
- 
+
     Args:
         level: Python logging level string — "DEBUG", "INFO", "WARNING", "ERROR".
                Loaded from settings.log_level in each service; defaults to "INFO".
@@ -61,7 +62,10 @@ def configure_logging(level: str = "INFO") -> None:
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     structlog.configure(
-        processors=shared_processors + [structlog.stdlib.ProcessorFormatter.wrap_for_formatter,],
+        processors=shared_processors
+        + [
+            structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
+        ],
         logger_factory=structlog.stdlib.LoggerFactory(),
         wrapper_class=structlog.stdlib.BoundLogger,
         cache_logger_on_first_use=True,

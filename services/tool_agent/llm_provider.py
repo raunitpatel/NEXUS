@@ -21,8 +21,8 @@ when switching providers.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import Any, Protocol, runtime_checkable
 
 import anthropic
 import google.generativeai as genai
@@ -30,6 +30,7 @@ import httpx
 import structlog
 
 logger = structlog.get_logger(__name__)
+
 
 # Shared response type
 @dataclass
@@ -85,7 +86,7 @@ class LLMProvider(Protocol):
         system: str,
         user: str,
         tools: list[dict[str, Any]],
-    ) -> "ToolCallResult":
+    ) -> ToolCallResult:
         """Send completion with tool definitions and parse tool call response."""
         ...
 
@@ -151,8 +152,7 @@ class OllamaProvider:
 
         if json_mode:
             effective_system = (
-                system
-                + "\n\nIMPORTANT: You MUST respond with valid JSON only. "
+                system + "\n\nIMPORTANT: You MUST respond with valid JSON only. "
                 "No markdown, no prose, no code fences. Raw JSON only."
             )
 
@@ -219,7 +219,7 @@ class OllamaProvider:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
-    
+
     async def complete_with_tools(
         self,
         system: str,
@@ -240,10 +240,7 @@ class OllamaProvider:
         Returns:
             ToolCallResult parsed from JSON response.
         """
-        tool_list = "\n".join(
-            f"- {t['name']}: {t['description']}"
-            for t in tools
-        )
+        tool_list = "\n".join(f"- {t['name']}: {t['description']}" for t in tools)
         tool_names = [t["name"] for t in tools]
 
         augmented_system = (
@@ -268,7 +265,7 @@ class OllamaProvider:
                 prompt_tokens=llm_response.prompt_tokens,
                 completion_tokens=llm_response.completion_tokens,
             )
-        except (json.JSONDecodeError, KeyError) as exc:
+        except (json.JSONDecodeError, KeyError):
             # LLM failed to follow JSON format — return as plain answer
             return ToolCallResult(
                 tool_name=None,
@@ -335,17 +332,9 @@ class GeminiProvider:
 
         usage = getattr(response, "usage_metadata", None)
 
-        prompt_tokens = (
-            getattr(usage, "prompt_token_count", 0) or 0
-            if usage
-            else 0
-        )
+        prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0 if usage else 0
 
-        completion_tokens = (
-            getattr(usage, "candidates_token_count", 0) or 0
-            if usage
-            else 0
-        )
+        completion_tokens = getattr(usage, "candidates_token_count", 0) or 0 if usage else 0
 
         logger.debug(
             "gemini.complete",
@@ -359,7 +348,7 @@ class GeminiProvider:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
-    
+
     async def complete_with_tools(
         self,
         system: str,
@@ -380,10 +369,7 @@ class GeminiProvider:
         Returns:
             ToolCallResult parsed from JSON response.
         """
-        tool_list = "\n".join(
-            f"- {t['name']}: {t['description']}"
-            for t in tools
-        )
+        tool_list = "\n".join(f"- {t['name']}: {t['description']}" for t in tools)
         tool_names = [t["name"] for t in tools]
 
         augmented_system = (
@@ -408,7 +394,7 @@ class GeminiProvider:
                 prompt_tokens=llm_response.prompt_tokens,
                 completion_tokens=llm_response.completion_tokens,
             )
-        except (json.JSONDecodeError, KeyError) as exc:
+        except (json.JSONDecodeError, KeyError):
             # LLM failed to follow JSON format — return as plain answer
             return ToolCallResult(
                 tool_name=None,
@@ -455,8 +441,7 @@ class ClaudeProvider:
 
             if json_mode:
                 effective_user = (
-                    user
-                    + "\n\nIMPORTANT: Return valid JSON only. "
+                    user + "\n\nIMPORTANT: Return valid JSON only. "
                     "No markdown, no prose, no code fences."
                 )
 
@@ -498,7 +483,7 @@ class ClaudeProvider:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
-    
+
     async def complete_with_tools(
         self,
         system: str,
@@ -595,10 +580,8 @@ def get_llm_provider() -> LLMProvider:
         )
 
     raise ValueError(
-        f"Unknown LLM_PROVIDER='{provider_name}'. "
-        "Supported values: 'ollama', 'gemini', 'claude'."
+        f"Unknown LLM_PROVIDER='{provider_name}'. Supported values: 'ollama', 'gemini', 'claude'."
     )
-
 
 
 @dataclass
@@ -614,6 +597,7 @@ class ToolCallResult:
         completion_tokens: Output tokens consumed.
         raw_text: Any text content the LLM emitted before the tool call.
     """
+
     tool_name: str | None
     tool_input: dict[str, Any]
     stop_reason: str

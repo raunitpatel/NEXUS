@@ -16,11 +16,11 @@ from typing import Any
 
 import httpx
 import structlog
-
+from sse_emitter import emit_event
 from state import OrchestratorState, TaskPlan
+
 from nodes import get_redis_client
 from nodes.task_persistence import task_exists
-from sse_emitter import emit_event
 
 logger = structlog.get_logger(__name__)
 
@@ -80,6 +80,7 @@ def _select_next_task(
         if task["task_id"] not in completed_ids:
             return task
     return None
+
 
 def _remap_input_for_agent(
     agent_type: str,
@@ -163,11 +164,18 @@ async def dispatch_next_task(state: OrchestratorState) -> dict[str, Any]:
     try:
         if not await task_exists(task_id):
             msg = f"Task {task_id} does not exist in the tasks table before dispatch."
-            logger.error("node.dispatch_next_task.missing_task_record", run_id=run_id, task_id=task_id)
+            logger.error(
+                "node.dispatch_next_task.missing_task_record", run_id=run_id, task_id=task_id
+            )
             return {"error": msg}
         logger.info("task.exists.confirmed", run_id=run_id, task_id=task_id)
     except Exception as exc:
-        logger.error("node.dispatch_next_task.task_existence_check_failed", run_id=run_id, task_id=task_id, error=str(exc))
+        logger.error(
+            "node.dispatch_next_task.task_existence_check_failed",
+            run_id=run_id,
+            task_id=task_id,
+            error=str(exc),
+        )
         return {"error": str(exc)}
 
     raw_input = next_task.get("input", {})
@@ -208,12 +216,19 @@ async def dispatch_next_task(state: OrchestratorState) -> dict[str, Any]:
     except httpx.TimeoutException:
         elapsed = int((time.monotonic() - start_ms) * 1000)
         msg = f"Agent {agent_type} timed out after {elapsed}ms (limit: {settings.task_timeout_seconds}s)."
-        logger.warning("node.dispatch_next_task.timeout", run_id=run_id, agent_type=agent_type, elapsed_ms=elapsed)
+        logger.warning(
+            "node.dispatch_next_task.timeout",
+            run_id=run_id,
+            agent_type=agent_type,
+            elapsed_ms=elapsed,
+        )
         return {"error": msg}
 
     except httpx.HTTPStatusError as exc:
         msg = f"Agent {agent_type} returned HTTP {exc.response.status_code}: {exc.response.text[:200]}"
-        logger.warning("node.dispatch_next_task.http_error", run_id=run_id, status=exc.response.status_code)
+        logger.warning(
+            "node.dispatch_next_task.http_error", run_id=run_id, status=exc.response.status_code
+        )
         return {"error": msg}
 
     except httpx.RequestError as exc:

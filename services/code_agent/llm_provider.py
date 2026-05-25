@@ -31,6 +31,7 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
+
 # Shared response type
 @dataclass
 class LLMResponse:
@@ -142,8 +143,7 @@ class OllamaProvider:
 
         if json_mode:
             effective_system = (
-                system
-                + "\n\nIMPORTANT: You MUST respond with valid JSON only. "
+                system + "\n\nIMPORTANT: You MUST respond with valid JSON only. "
                 "No markdown, no prose, no code fences. Raw JSON only."
             )
 
@@ -267,17 +267,9 @@ class GeminiProvider:
 
         usage = getattr(response, "usage_metadata", None)
 
-        prompt_tokens = (
-            getattr(usage, "prompt_token_count", 0) or 0
-            if usage
-            else 0
-        )
+        prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0 if usage else 0
 
-        completion_tokens = (
-            getattr(usage, "candidates_token_count", 0) or 0
-            if usage
-            else 0
-        )
+        completion_tokens = getattr(usage, "candidates_token_count", 0) or 0 if usage else 0
 
         logger.debug(
             "gemini.complete",
@@ -328,8 +320,7 @@ class ClaudeProvider:
 
             if json_mode:
                 effective_user = (
-                    user
-                    + "\n\nIMPORTANT: Return valid JSON only. "
+                    user + "\n\nIMPORTANT: Return valid JSON only. "
                     "No markdown, no prose, no code fences."
                 )
 
@@ -412,6 +403,5 @@ def get_llm_provider() -> LLMProvider:
         )
 
     raise ValueError(
-        f"Unknown LLM_PROVIDER='{provider_name}'. "
-        "Supported values: 'ollama', 'gemini', 'claude'."
+        f"Unknown LLM_PROVIDER='{provider_name}'. Supported values: 'ollama', 'gemini', 'claude'."
     )

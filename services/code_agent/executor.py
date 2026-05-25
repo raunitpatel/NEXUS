@@ -115,7 +115,7 @@ class CodeExecutor:
                 loop.run_in_executor(None, self._run_subprocess, cmd),
                 timeout=float(self._timeout),
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning(
                 "executor.timeout",
                 language=language,

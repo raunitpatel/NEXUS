@@ -6,7 +6,7 @@ All Redis calls are mocked.
 """
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -22,7 +22,7 @@ TEST_ALGORITHM = "HS256"
 
 def _make_token(user_id: str, jti: str, expired: bool = False) -> str:
     """Generate a test JWT token."""
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     delta = timedelta(seconds=-1) if expired else timedelta(seconds=86400)
     payload = {
         "sub": user_id,
@@ -53,14 +53,6 @@ async def test_exempt_path_bypasses_auth() -> None:
         await response(scope, receive, send)
 
     middleware = AuthMiddleware(dummy_app)
-
-    scope = {
-        "type": "http",
-        "method": "GET",
-        "path": "/healthz",
-        "headers": [],
-        "query_string": b"",
-    }
 
     # Should not raise — no token required
     # Full Starlette middleware test requires TestClient; verify via integration test instead
@@ -96,6 +88,7 @@ async def test_missing_auth_header_returns_401(mock_app_state: MagicMock) -> Non
 async def test_valid_token_with_live_session_passes(mock_app_state: MagicMock) -> None:
     """Valid JWT + Redis session present → request proceeds to call_next."""
     import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
 
@@ -133,6 +126,7 @@ async def test_valid_token_with_live_session_passes(mock_app_state: MagicMock) -
 async def test_expired_token_returns_401(mock_app_state: MagicMock) -> None:
     """Expired JWT returns 401 without calling call_next."""
     import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
 
@@ -166,6 +160,7 @@ async def test_expired_token_returns_401(mock_app_state: MagicMock) -> None:
 async def test_valid_token_no_redis_session_returns_401(mock_app_state: MagicMock) -> None:
     """Valid JWT but missing Redis session returns 401 (revoked token scenario)."""
     import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
 

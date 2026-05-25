@@ -8,28 +8,26 @@ dispatches graph execution as a background asyncio task — returning
 """
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import redis.asyncio as aioredis
 import structlog
+from config import settings
 from fastapi import FastAPI
+from graph import build_graph
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-
-from config import settings
-from graph import build_graph
 from shared.logging import configure_logging
-from shared.metrics import configure_metrics, active_runs, orchestrator_runs_total
-
+from shared.metrics import active_runs, configure_metrics, orchestrator_runs_total
 from shared.telemetry import configure_telemetry
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from state import OrchestratorState
-
 
 logger = structlog.get_logger(__name__)
 
 # Lifespan
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -73,6 +71,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.redis = redis_client
 
     from nodes import set_redis_client
+
     set_redis_client(redis_client)
     logger.info("orchestrator.redis_wired_to_nodes")
 
@@ -83,7 +82,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await redis_client.aclose()
     await engine.dispose()
 
+
 # Request / response models
+
 
 class OrchestrateRequest(BaseModel):
     """
@@ -99,6 +100,7 @@ class OrchestrateRequest(BaseModel):
     query: str
     user_id: str
 
+
 class OrchestrateResponse(BaseModel):
     """
     Response returned immediately from POST /orchestrate.
@@ -112,6 +114,7 @@ class OrchestrateResponse(BaseModel):
 
     run_id: str
     status: str
+
 
 def create_app() -> FastAPI:
     """
@@ -177,9 +180,7 @@ def create_app() -> FastAPI:
             "metadata": {},
         }
 
-        asyncio.ensure_future(
-            _run_graph(app.state.graph, initial_state, body.run_id)
-        )
+        asyncio.ensure_future(_run_graph(app.state.graph, initial_state, body.run_id))
 
         logger.info(
             "orchestrator.run_dispatched",

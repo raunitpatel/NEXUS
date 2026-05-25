@@ -15,13 +15,12 @@ from typing import Annotated, Any
 
 import httpx
 import structlog
+from config import settings
+from dependencies import get_current_user, get_db_session
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from config import settings
-from dependencies import get_current_user, get_db_session
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -383,6 +382,7 @@ async def list_runs(
 
 # ── GET /api/v1/runs/{run_id}/events ──────────────────────────────────────────
 
+
 @router.get(
     "/{run_id}/events",
     response_model=list[RunEventSummary],
@@ -456,6 +456,7 @@ async def list_run_events(
 
 
 # ── GET /api/v1/runs/{run_id} ─────────────────────────────────────────────────
+
 
 @router.get(
     "/{run_id}",

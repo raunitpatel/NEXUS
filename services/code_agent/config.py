@@ -7,6 +7,7 @@ No other file in this service may call os.getenv directly.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     """
     Code Agent settings loaded from environment variables.

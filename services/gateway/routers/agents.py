@@ -17,12 +17,11 @@ from typing import Annotated
 
 import httpx
 import structlog
+from dependencies import get_current_user, get_db_session
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from dependencies import get_current_user, get_db_session
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -96,7 +95,7 @@ async def _check_all_health(agents: list[dict]) -> dict[str, bool]:
     results = await asyncio.gather(*tasks, return_exceptions=True)
     return {
         a["agent_id"]: bool(r) if not isinstance(r, Exception) else False
-        for a, r in zip(agents, results)
+        for a, r in zip(agents, results, strict = False)
     }
 
 

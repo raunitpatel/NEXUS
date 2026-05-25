@@ -30,24 +30,25 @@ DB engine is accessed via nodes.db.get_db_engine().
 from __future__ import annotations
 
 import json
-import time
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
-from state import OrchestratorState
-from nodes import get_redis_client
-from sse_emitter import emit_event
 from shared.kafka_schemas import EventMessage
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sse_emitter import emit_event
+from state import OrchestratorState
+
+from nodes import get_redis_client
 from nodes.db import get_db_engine
 
 logger = structlog.get_logger(__name__)
 
 # Standard Python logger for pre/post-write verification logging
 _raw_logger = logging.getLogger(__name__)
+
 
 def _extract_preview(data: Any) -> str | None:
     if isinstance(data, str):
@@ -67,6 +68,7 @@ def _extract_preview(data: Any) -> str | None:
                 return result
 
     return None
+
 
 def _build_metadata(state: OrchestratorState, terminal_status: str) -> dict[str, Any]:
     """
@@ -91,24 +93,23 @@ def _build_metadata(state: OrchestratorState, terminal_status: str) -> dict[str,
         output = t.get("output") or {}
         raw_response = t.get("raw_response") or {}
 
-        output_preview = (
-            _extract_preview(output)
-            or _extract_preview(raw_response)
-        )
+        output_preview = _extract_preview(output) or _extract_preview(raw_response)
 
         has_payload = bool(output or raw_response)
 
-        task_summaries.append({
-            "task_id": t.get("task_id"),
-            "agent_type": t.get("agent_type"),
-            "status": "failed" if t.get("error") else "completed",
-            "duration_ms": t.get("duration_ms", 0),
-            "attempt": t.get("attempt", 1),
-            "output_preview": output_preview,
-            "summary": t.get("summary"),
-            "has_payload": has_payload,
-            "error": t.get("error"),
-        })
+        task_summaries.append(
+            {
+                "task_id": t.get("task_id"),
+                "agent_type": t.get("agent_type"),
+                "status": "failed" if t.get("error") else "completed",
+                "duration_ms": t.get("duration_ms", 0),
+                "attempt": t.get("attempt", 1),
+                "output_preview": output_preview,
+                "summary": t.get("summary"),
+                "has_payload": has_payload,
+                "error": t.get("error"),
+            }
+        )
 
     # Deduplicated agent types in execution order
     seen: set[str] = set()
@@ -122,10 +123,7 @@ def _build_metadata(state: OrchestratorState, terminal_status: str) -> dict[str,
             agent_types_used.append(at)
 
     # NEW: total run duration for analytics + charts
-    total_duration_ms = sum(
-        t.get("duration_ms", 0)
-        for t in completed_tasks
-    )
+    total_duration_ms = sum(t.get("duration_ms", 0) for t in completed_tasks)
 
     return {
         "input_tokens": state.get("input_tokens", 0),
@@ -138,7 +136,7 @@ def _build_metadata(state: OrchestratorState, terminal_status: str) -> dict[str,
         "agent_types_used": agent_types_used,
         "terminal_status": terminal_status,
         "error_detail": state.get("error"),
-        "finalized_at": datetime.now(timezone.utc).isoformat(),
+        "finalized_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -223,16 +221,16 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
             # --- Post-write verification ---
             async with session_factory() as verify_session:
                 row = await verify_session.execute(
-                    text(
-                        "SELECT status, metadata FROM runs WHERE id = :run_id"
-                    ),
+                    text("SELECT status, metadata FROM runs WHERE id = :run_id"),
                     {"run_id": run_id},
                 )
                 result = row.fetchone()
 
             if result:
                 persisted_meta = result.metadata or {}
-                persisted_keys = list(persisted_meta.keys()) if isinstance(persisted_meta, dict) else []
+                persisted_keys = (
+                    list(persisted_meta.keys()) if isinstance(persisted_meta, dict) else []
+                )
                 _raw_logger.info(
                     "[finalize_run] POST-WRITE VERIFIED run_id=%s "
                     "db_status=%s persisted_metadata_keys=%s "

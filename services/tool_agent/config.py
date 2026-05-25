@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
     )
-    
+
     # Application
     environment: str = "development"
     log_level: str = "info"

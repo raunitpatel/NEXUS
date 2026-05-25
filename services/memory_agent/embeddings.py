@@ -17,9 +17,8 @@ Usage:
 from __future__ import annotations
 
 import structlog
-from sentence_transformers import SentenceTransformer
-
 from config import settings
+from sentence_transformers import SentenceTransformer
 
 logger = structlog.get_logger(__name__)
 

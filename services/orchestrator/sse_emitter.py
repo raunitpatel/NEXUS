@@ -29,14 +29,14 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import redis.asyncio as aioredis
 import structlog
+from nodes.db import get_db_engine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
-
-from nodes.db import get_db_engine
 
 logger = structlog.get_logger(__name__)
 
@@ -264,7 +264,6 @@ async def sse_stream_generator(
         # is live — this also validates the connection before the first real event
         yield f": stream-open run_id={run_id}\n\n"
 
-        last_heartbeat = time.monotonic()
 
         # Use listen() — the correct async pattern for redis.asyncio pub/sub.
         # listen() is an async generator that properly yields to the event loop.
@@ -404,7 +403,7 @@ async def _listen_with_heartbeat(
                 timeout=heartbeat_interval,
             )
             yield message
-        except asyncio.TimeoutError:
+        except TimeoutError:
             yield None
         except asyncio.CancelledError:
             logger.debug("_listen_with_heartbeat.cancelled", run_id=run_id)

@@ -5,13 +5,15 @@ All route handlers that need the database or Redis must declare these
 as FastAPI Depends() parameters — never access request.app.state directly.
 """
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+
 import redis.asyncio as aioredis
 import structlog
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 logger = structlog.get_logger(__name__)
+
 
 async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
     """
@@ -33,6 +35,7 @@ async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
             await session.rollback()
             raise
 
+
 async def get_redis(request: Request) -> aioredis.Redis:
     """
     Return the shared Redis async client from app.state.
@@ -41,6 +44,7 @@ async def get_redis(request: Request) -> aioredis.Redis:
         Shared aioredis.Redis instance — do not close it; it is managed by lifespan.
     """
     return request.app.state.redis
+
 
 async def get_current_user(request: Request) -> dict[str, str]:
     """

@@ -17,7 +17,6 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from llm_provider import LLMResponse
 
 
@@ -50,18 +49,22 @@ async def test_full_graph_run_with_mocked_agents() -> None:
     Verifies: state reaches finalize_run with status=completed and final_output set.
     """
     # LLM responses
-    decompose_json = json.dumps({
-        "tasks": [
-            {"agent_type": "search", "description": "Find capital of France", "depends_on": []}
-        ]
-    })
+    decompose_json = json.dumps(
+        {
+            "tasks": [
+                {"agent_type": "search", "description": "Find capital of France", "depends_on": []}
+            ]
+        }
+    )
     synthesize_text = "The capital of France is Paris."
 
     mock_provider = AsyncMock()
-    mock_provider.complete = AsyncMock(side_effect=[
-        LLMResponse(content=decompose_json, prompt_tokens=100, completion_tokens=50),
-        LLMResponse(content=synthesize_text, prompt_tokens=200, completion_tokens=30),
-    ])
+    mock_provider.complete = AsyncMock(
+        side_effect=[
+            LLMResponse(content=decompose_json, prompt_tokens=100, completion_tokens=50),
+            LLMResponse(content=synthesize_text, prompt_tokens=200, completion_tokens=30),
+        ]
+    )
 
     # Agent HTTP response
     mock_http_response = MagicMock()
@@ -92,8 +95,14 @@ async def test_full_graph_run_with_mocked_agents() -> None:
         patch("nodes.decompose_query.insert_task_plan", new_callable=AsyncMock),
         patch("nodes.record_result.get_db_engine", return_value=mock_db_engine),
         patch("nodes.finalize_run.get_db_engine", return_value=mock_db_engine),
-        patch("nodes.record_result.async_sessionmaker", return_value=MagicMock(return_value=mock_session)),
-        patch("nodes.finalize_run.async_sessionmaker", return_value=MagicMock(return_value=mock_session)),
+        patch(
+            "nodes.record_result.async_sessionmaker",
+            return_value=MagicMock(return_value=mock_session),
+        ),
+        patch(
+            "nodes.finalize_run.async_sessionmaker",
+            return_value=MagicMock(return_value=mock_session),
+        ),
     ):
         from graph import build_graph
 
@@ -113,9 +122,9 @@ async def test_graph_run_agent_timeout_exhausts_retries() -> None:
     """
     import httpx
 
-    decompose_json = json.dumps({
-        "tasks": [{"agent_type": "search", "description": "Find something", "depends_on": []}]
-    })
+    decompose_json = json.dumps(
+        {"tasks": [{"agent_type": "search", "description": "Find something", "depends_on": []}]}
+    )
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(

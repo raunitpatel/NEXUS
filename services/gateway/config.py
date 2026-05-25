@@ -6,9 +6,10 @@ No other file in this service may call os.getenv directly.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
-    """ 
-    Gateway service settings loaded from environment variables. 
+    """
+    Gateway service settings loaded from environment variables.
     All fields have defaults suitable for local Docker Compose development.
     In production (Railway), these are injected as Railway environment variables.
     """
@@ -52,6 +53,6 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list[str]:
         """Parse comma-separated CORS origins into a list."""
         return [o.strip() for o in self.cors_origins.split(",")]
-    
-settings = Settings()
 
+
+settings = Settings()

@@ -2,7 +2,6 @@
 """Unit tests for graph.py — graph compilation and all conditional edge routers."""
 
 import pytest
-
 from graph import (
     _route_after_await,
     _route_after_error,

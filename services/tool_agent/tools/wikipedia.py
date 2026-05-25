@@ -12,7 +12,6 @@ from urllib.parse import quote
 
 import httpx
 import structlog
-
 from config import settings
 
 logger = structlog.get_logger(__name__)
@@ -79,10 +78,7 @@ class WikipediaTool:
             response = await client.get(
                 url,
                 params={"redirect": "true"},
-                headers={
-                    "Accept": "application/json",
-                    "User-Agent": "NEXUS-Tool-Agent/1.0"
-                },
+                headers={"Accept": "application/json", "User-Agent": "NEXUS-Tool-Agent/1.0"},
                 follow_redirects=True,
             )
 

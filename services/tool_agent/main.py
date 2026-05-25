@@ -7,22 +7,22 @@ Exposes:
   GET  /healthz — Liveness probe
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
 import structlog
-from fastapi import FastAPI
-from prometheus_fastapi_instrumentator import Instrumentator
-from pydantic import BaseModel
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-
 from agent import ToolAgent
 from config import settings
+from fastapi import FastAPI
+from llm_provider import get_tool_definitions
+from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel
 from shared.kafka_client import KafkaProducerFactory
 from shared.logging import configure_logging
 from shared.metrics import configure_metrics
 from shared.telemetry import configure_telemetry
-from llm_provider import get_tool_definitions
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 logger = structlog.get_logger(__name__)
 
@@ -31,7 +31,11 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Initialise DB engine and Kafka producer at startup; close on shutdown."""
     configure_logging(level=settings.log_level)
-    configure_telemetry(service_name=settings.service_name, environment=settings.environment, app=app,)
+    configure_telemetry(
+        service_name=settings.service_name,
+        environment=settings.environment,
+        app=app,
+    )
     configure_metrics()
 
     engine: AsyncEngine = create_async_engine(
@@ -43,9 +47,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.db_engine = engine
 
     try:
-        await KafkaProducerFactory.get_producer(
-            bootstrap_servers=settings.kafka_bootstrap_servers
-        )
+        await KafkaProducerFactory.get_producer(bootstrap_servers=settings.kafka_bootstrap_servers)
         logger.info("tool_agent.kafka_producer_ready")
     except Exception as exc:
         logger.warning("tool_agent.kafka_unavailable", error=str(exc))
@@ -60,6 +62,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 class RunRequest(BaseModel):
     """Payload for POST /run — matches dispatch_next_task HTTP contract."""
+
     run_id: str
     task_id: str
     user_id: str
@@ -70,6 +73,7 @@ class RunRequest(BaseModel):
 
 class RunResponse(BaseModel):
     """Response from POST /run — matches await_task_result expected shape."""
+
     output: dict[str, Any] | None = None
     error: str | None = None
 
@@ -118,7 +122,6 @@ def create_app() -> FastAPI:
             instruction=instruction[:100],
         )
 
-        from fastapi import Request
         # Access db_engine from app.state via the app instance
         agent = ToolAgent(db_engine=app.state.db_engine)
 

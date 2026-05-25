@@ -8,12 +8,13 @@ that routing logic works even with stub implementations everywhere else.
 """
 
 import structlog
-
-from state import OrchestratorState
-from nodes import get_redis_client
 from sse_emitter import emit_event
+from state import OrchestratorState
+
+from nodes import get_redis_client
 
 logger = structlog.get_logger(__name__)
+
 
 async def handle_error(state: OrchestratorState) -> OrchestratorState:
     """
@@ -39,7 +40,7 @@ async def handle_error(state: OrchestratorState) -> OrchestratorState:
 
     # Event persistence is centralized in sse_emitter.emit_event(); this node
     # only emits the run_error event for delivery and persistence.
-    
+
     try:
         _redis_client = get_redis_client()
         if _redis_client is None:
@@ -58,7 +59,7 @@ async def handle_error(state: OrchestratorState) -> OrchestratorState:
             )
     except Exception as _exc:
         logger.warning("handle_error.emit_failed", run_id=run_id, error=str(_exc))
-        
+
     return {
         **state,
         "retry_count": current_retry + 1,

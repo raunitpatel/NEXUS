@@ -28,11 +28,9 @@ from typing import Any
 import asyncpg
 import redis.asyncio as aioredis
 import structlog
-
 from config import settings
 from embeddings import EmbeddingModel
 from pgvector_store import cosine_search, insert_embedding
-
 from shared.metrics import agent_task_duration_seconds, agent_tasks_total
 
 logger = structlog.get_logger(__name__)
@@ -164,9 +162,7 @@ class MemoryAgent:
         start_ms = time.monotonic()
 
         loop = asyncio.get_event_loop()
-        embedding: list[float] = await loop.run_in_executor(
-            None, self._model.encode, content
-        )
+        embedding: list[float] = await loop.run_in_executor(None, self._model.encode, content)
 
         metadata: dict[str, Any] = {"content_type": content_type}
         if user_id:
@@ -285,7 +281,7 @@ class MemoryAgent:
             duration_ms / 1000
         )
         agent_tasks_total.labels(agent="memory-search", status="success").inc()
-        
+
         return SearchResult(results=results, from_cache=False, duration_ms=duration_ms)
 
 

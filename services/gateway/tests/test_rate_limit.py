@@ -14,8 +14,8 @@ import pytest
 from starlette.requests import Request
 from starlette.responses import Response
 
-
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
 
 def _make_mock_request(
     path: str = "/api/v1/runs",
@@ -212,6 +212,7 @@ async def test_unauthenticated_request_uses_ip_as_identifier() -> None:
 async def test_rate_limit_key_includes_user_id_and_minute_epoch() -> None:
     """Redis key pattern is ratelimit:{user_id}:{minute_epoch}."""
     import time
+
     from middleware.rate_limit import RateLimitMiddleware
 
     redis = _make_redis(incr_return=1)

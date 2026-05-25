@@ -11,21 +11,18 @@ AGNT-010 adds tool_results table INSERT alongside the tasks UPDATE.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
 from typing import Any
-from state import OrchestratorState
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, AsyncSession
-from nodes import get_redis_client
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sse_emitter import emit_event
+from state import OrchestratorState
 
+from nodes import get_redis_client
 from nodes.db import get_db_engine
 
 logger = structlog.get_logger(__name__)
-
-
 
 
 async def _update_task_record(
@@ -109,10 +106,10 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
                 task_id=task_id,
                 status=db_status,
                 output={
-                        "output": task_result.get("output"),
-                        "summary": task_result.get("summary"),
-                        "raw_response": task_result.get("raw_response"),
-                    },
+                    "output": task_result.get("output"),
+                    "summary": task_result.get("summary"),
+                    "raw_response": task_result.get("raw_response"),
+                },
                 error=task_result.get("error"),
                 duration_ms=task_result.get("duration_ms", 0),
             )

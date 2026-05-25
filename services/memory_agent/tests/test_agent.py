@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
+
 
 def _mock_pool() -> AsyncMock:
     """Return a mock asyncpg pool."""
@@ -35,7 +35,7 @@ def _mock_redis() -> AsyncMock:
 
 def _fake_embedding(dim: int = 384) -> list[float]:
     """Return a fake normalized embedding vector."""
-    val = 1.0 / (dim ** 0.5)
+    val = 1.0 / (dim**0.5)
     return [val] * dim
 
 
@@ -66,14 +66,17 @@ def _fake_search_results() -> list[dict[str, Any]]:
 
 # ── EmbeddingModel tests ──────────────────────────────────────────────────────
 
+
 def test_embedding_model_encode_returns_384_floats() -> None:
     """EmbeddingModel.encode() returns list of 384 floats."""
     mock_st = MagicMock()
     import numpy as np
+
     mock_st.encode.return_value = np.array(_fake_embedding(384))
 
     with patch("embeddings.SentenceTransformer", return_value=mock_st):
         from embeddings import EmbeddingModel
+
         # Reset singleton for test isolation
         EmbeddingModel._instance = None
         model = EmbeddingModel()
@@ -87,10 +90,12 @@ def test_embedding_model_singleton_returns_same_instance() -> None:
     """EmbeddingModel() always returns the same singleton instance."""
     mock_st = MagicMock()
     import numpy as np
+
     mock_st.encode.return_value = np.array(_fake_embedding())
 
     with patch("embeddings.SentenceTransformer", return_value=mock_st):
         from embeddings import EmbeddingModel
+
         EmbeddingModel._instance = None
         m1 = EmbeddingModel()
         m2 = EmbeddingModel()
@@ -99,6 +104,7 @@ def test_embedding_model_singleton_returns_same_instance() -> None:
 
 
 # ── MemoryAgent.embed() tests ─────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_embed_calls_insert_embedding_and_returns_result() -> None:
@@ -155,6 +161,7 @@ async def test_embed_result_to_dict_has_required_fields() -> None:
 
 
 # ── MemoryAgent.search() tests ────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_search_cache_miss_calls_pgvector_and_writes_redis() -> None:
@@ -279,11 +286,12 @@ async def test_cache_key_format_includes_user_id_and_hash() -> None:
 
 # ── main.py endpoint tests ────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_healthz_returns_ok() -> None:
     """GET /healthz returns 200 with status ok."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
         response = client.get("/healthz")
@@ -295,14 +303,21 @@ async def test_healthz_returns_ok() -> None:
 @pytest.mark.asyncio
 async def test_run_endpoint_missing_content_for_write_returns_error() -> None:
     """POST /run with empty input.content for memory_write returns error."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
-        response = client.post("/run", json={
-            "run_id": "r1", "task_id": "t1", "user_id": "u1",
-            "task_type": "memory_write", "input": {}, "attempt": 1,
-        })
+        response = client.post(
+            "/run",
+            json={
+                "run_id": "r1",
+                "task_id": "t1",
+                "user_id": "u1",
+                "task_type": "memory_write",
+                "input": {},
+                "attempt": 1,
+            },
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -312,14 +327,21 @@ async def test_run_endpoint_missing_content_for_write_returns_error() -> None:
 @pytest.mark.asyncio
 async def test_run_endpoint_missing_query_for_read_returns_error() -> None:
     """POST /run with empty input.query for memory_read returns error."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
-        response = client.post("/run", json={
-            "run_id": "r1", "task_id": "t1", "user_id": "u1",
-            "task_type": "memory_read", "input": {}, "attempt": 1,
-        })
+        response = client.post(
+            "/run",
+            json={
+                "run_id": "r1",
+                "task_id": "t1",
+                "user_id": "u1",
+                "task_type": "memory_read",
+                "input": {},
+                "attempt": 1,
+            },
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -329,14 +351,21 @@ async def test_run_endpoint_missing_query_for_read_returns_error() -> None:
 @pytest.mark.asyncio
 async def test_run_endpoint_unknown_task_type_returns_error() -> None:
     """POST /run with unknown task_type returns descriptive error."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
-        response = client.post("/run", json={
-            "run_id": "r1", "task_id": "t1", "user_id": "u1",
-            "task_type": "summarize", "input": {"content": "test"}, "attempt": 1,
-        })
+        response = client.post(
+            "/run",
+            json={
+                "run_id": "r1",
+                "task_id": "t1",
+                "user_id": "u1",
+                "task_type": "summarize",
+                "input": {"content": "test"},
+                "attempt": 1,
+            },
+        )
 
     assert response.status_code == 200
     data = response.json()

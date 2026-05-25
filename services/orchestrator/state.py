@@ -14,8 +14,8 @@ routers and all node functions. Any change here must be reflected in:
 from __future__ import annotations
 
 from typing import Any, Literal
-from typing_extensions import TypedDict
 
+from typing_extensions import TypedDict
 
 AgentType = Literal[
     "search",

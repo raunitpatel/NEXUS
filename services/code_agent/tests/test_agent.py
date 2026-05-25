@@ -15,15 +15,18 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from executor import CodeExecutor, ExecutionResult
 from llm_provider import LLMResponse
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-def _llm_response(content: str, prompt_tokens: int = 50, completion_tokens: int = 20) -> LLMResponse:
-    return LLMResponse(content=content, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+
+def _llm_response(
+    content: str, prompt_tokens: int = 50, completion_tokens: int = 20
+) -> LLMResponse:
+    return LLMResponse(
+        content=content, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+    )
 
 
 def _base_run_kwargs() -> dict[str, Any]:
@@ -36,6 +39,7 @@ def _base_run_kwargs() -> dict[str, Any]:
 
 
 # ── CodeExecutor tests ────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_executor_success_exit_code_zero() -> None:
@@ -91,9 +95,11 @@ async def test_executor_stdout_captured() -> None:
 
 # ── CodeAgent._extract_code tests ─────────────────────────────────────────────
 
+
 def test_extract_code_strips_python_fence() -> None:
     """_extract_code strips ```python ... ``` fences."""
     from agent import CodeAgent
+
     agent = CodeAgent.__new__(CodeAgent)  # skip __init__
 
     raw = "```python\nprint(42)\n```"
@@ -103,6 +109,7 @@ def test_extract_code_strips_python_fence() -> None:
 def test_extract_code_strips_plain_fence() -> None:
     """_extract_code strips ``` ... ``` fences without language tag."""
     from agent import CodeAgent
+
     agent = CodeAgent.__new__(CodeAgent)
 
     raw = "```\nprint(42)\n```"
@@ -112,6 +119,7 @@ def test_extract_code_strips_plain_fence() -> None:
 def test_extract_code_no_fence_returns_stripped() -> None:
     """_extract_code returns raw code when no fence is present."""
     from agent import CodeAgent
+
     agent = CodeAgent.__new__(CodeAgent)
 
     raw = "  print(42)  "
@@ -120,15 +128,14 @@ def test_extract_code_no_fence_returns_stripped() -> None:
 
 # ── CodeAgent.run() tests ─────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_code_agent_success_on_first_iteration() -> None:
     """CodeAgent.run() returns success result when code works on first try."""
     from agent import CodeAgent
 
     mock_provider = AsyncMock()
-    mock_provider.complete = AsyncMock(
-        return_value=_llm_response("print(sum(range(11)))")
-    )
+    mock_provider.complete = AsyncMock(return_value=_llm_response("print(sum(range(11)))"))
 
     with (
         patch("agent.get_llm_provider", return_value=mock_provider),
@@ -150,10 +157,12 @@ async def test_code_agent_success_on_second_iteration() -> None:
     from agent import CodeAgent
 
     mock_provider = AsyncMock()
-    mock_provider.complete = AsyncMock(side_effect=[
-        _llm_response("def broken(: pass"),       # iteration 1 — syntax error
-        _llm_response("print(42)"),                # iteration 2 — fixed
-    ])
+    mock_provider.complete = AsyncMock(
+        side_effect=[
+            _llm_response("def broken(: pass"),  # iteration 1 — syntax error
+            _llm_response("print(42)"),  # iteration 2 — fixed
+        ]
+    )
 
     with (
         patch("agent.get_llm_provider", return_value=mock_provider),
@@ -228,9 +237,7 @@ async def test_code_agent_llm_error_returns_error_result() -> None:
     from llm_provider import LLMProviderError
 
     mock_provider = AsyncMock()
-    mock_provider.complete = AsyncMock(
-        side_effect=LLMProviderError("claude", "Connection refused")
-    )
+    mock_provider.complete = AsyncMock(side_effect=LLMProviderError("claude", "Connection refused"))
 
     with (
         patch("agent.get_llm_provider", return_value=mock_provider),
@@ -290,17 +297,25 @@ async def test_code_agent_strips_markdown_from_llm_output() -> None:
 
 # ── main.py endpoint tests ────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_run_endpoint_missing_instruction_returns_error() -> None:
     """POST /run with empty input.instruction returns RunResponse with error."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
-        response = client.post("/run", json={
-            "run_id": "r1", "task_id": "t1", "user_id": "u1",
-            "task_type": "code", "input": {}, "attempt": 1,
-        })
+        response = client.post(
+            "/run",
+            json={
+                "run_id": "r1",
+                "task_id": "t1",
+                "user_id": "u1",
+                "task_type": "code",
+                "input": {},
+                "attempt": 1,
+            },
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -311,8 +326,8 @@ async def test_run_endpoint_missing_instruction_returns_error() -> None:
 @pytest.mark.asyncio
 async def test_healthz_returns_ok() -> None:
     """GET /healthz returns 200 with status ok."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
         response = client.get("/healthz")

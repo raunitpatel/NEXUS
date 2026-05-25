@@ -17,7 +17,6 @@ The response is a text/event-stream with:
 import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
-
 from sse_emitter import sse_stream_generator
 
 logger = structlog.get_logger(__name__)

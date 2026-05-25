@@ -54,7 +54,7 @@ def mock_redis() -> AsyncMock:
 @pytest.mark.asyncio
 async def test_register_success(mock_db_session: AsyncMock, mock_redis: AsyncMock) -> None:
     """POST /register with valid payload returns 201 with user fields."""
-    from routers.auth import register, RegisterRequest
+    from routers.auth import RegisterRequest, register
 
     # Simulate no existing user (duplicate check returns None)
     mock_result = MagicMock()
@@ -78,7 +78,7 @@ async def test_register_success(mock_db_session: AsyncMock, mock_redis: AsyncMoc
 async def test_register_duplicate_email_returns_409(mock_db_session: AsyncMock) -> None:
     """POST /register with existing email raises 409 HTTPException."""
     from fastapi import HTTPException
-    from routers.auth import register, RegisterRequest
+    from routers.auth import RegisterRequest, register
 
     # Simulate existing user found
     mock_result = MagicMock()
@@ -109,7 +109,7 @@ async def test_login_success_returns_token(
     mock_redis: AsyncMock,
 ) -> None:
     """POST /login with valid credentials returns TokenResponse with correct fields."""
-    from routers.auth import login, LoginRequest, _hash_password
+    from routers.auth import LoginRequest, _hash_password, login
 
     hashed = _hash_password("Test1234!")
     mock_row = MagicMock()
@@ -137,7 +137,7 @@ async def test_login_wrong_password_returns_401(
 ) -> None:
     """POST /login with wrong password raises 401 HTTPException."""
     from fastapi import HTTPException
-    from routers.auth import login, LoginRequest, _hash_password
+    from routers.auth import LoginRequest, _hash_password, login
 
     hashed = _hash_password("CorrectPassword!")
     mock_row = MagicMock()
@@ -162,7 +162,7 @@ async def test_login_nonexistent_email_returns_401(
 ) -> None:
     """POST /login with unknown email raises 401 HTTPException."""
     from fastapi import HTTPException
-    from routers.auth import login, LoginRequest
+    from routers.auth import LoginRequest, login
 
     mock_result = MagicMock()
     mock_result.fetchone.return_value = None  # user not found
@@ -182,7 +182,7 @@ async def test_login_redis_failure_returns_503(
 ) -> None:
     """POST /login raises 503 when Redis session write fails."""
     from fastapi import HTTPException
-    from routers.auth import login, LoginRequest, _hash_password
+    from routers.auth import LoginRequest, _hash_password, login
 
     hashed = _hash_password("Test1234!")
     mock_row = MagicMock()
@@ -213,6 +213,7 @@ async def test_login_redis_failure_returns_503(
 def test_create_access_token_contains_required_claims() -> None:
     """_create_access_token returns token with sub, jti, iat, exp, and display_name claims."""
     import importlib
+
     import config as cfg
 
     original_secret = cfg.settings.jwt_secret_key

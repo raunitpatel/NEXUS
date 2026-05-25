@@ -8,28 +8,25 @@ resources (asyncpg pool, Redis client).
 All inbound NEXUS traffic from the frontend passes through this service.
 """
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import AsyncIterator
 
 import redis.asyncio as aioredis
 import structlog
+from config import settings
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine
-from prometheus_fastapi_instrumentator import Instrumentator
 
 # NEW IMPORTS
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import HTTPBearer
-
-from config import settings
 from middleware.auth import AuthMiddleware
 from middleware.rate_limit import RateLimitMiddleware
-from routers import auth, runs, sse, agents, memory, metrics
-
+from prometheus_fastapi_instrumentator import Instrumentator
+from routers import agents, auth, memory, metrics, runs, sse
 from shared.logging import configure_logging
 from shared.telemetry import configure_telemetry
-from shared.metrics import configure_metrics
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 logger = structlog.get_logger(__name__)
 

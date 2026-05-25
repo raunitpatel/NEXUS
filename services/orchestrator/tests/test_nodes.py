@@ -17,14 +17,13 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from llm_provider import LLMResponse
 from state import OrchestratorState, TaskResult
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 def _base_state(**overrides: Any) -> OrchestratorState:
     """Return a minimal OrchestratorState for testing."""
@@ -32,28 +31,25 @@ def _base_state(**overrides: Any) -> OrchestratorState:
         "run_id": "run_test_001",
         "user_id": "user_test_001",
         "query": "What are the latest papers on LLM reasoning?",
-
         "task_plan": [],
         "completed_tasks": [],
         "pending_task": None,
         "task_result": None,
-
         "final_output": None,
-
         "status": "running",
         "error": None,
         "retry_count": 0,
-
         "input_tokens": 0,
         "output_tokens": 0,
-
         "metadata": {},
     }
     state.update(overrides)  # type: ignore[typeddict-item]
     return state
 
 
-def _mock_llm_response(content: str, prompt_tokens: int = 100, completion_tokens: int = 50) -> LLMResponse:
+def _mock_llm_response(
+    content: str, prompt_tokens: int = 100, completion_tokens: int = 50
+) -> LLMResponse:
     """Return a fake LLMResponse."""
     return LLMResponse(
         content=content,
@@ -66,15 +62,26 @@ def _mock_llm_response(content: str, prompt_tokens: int = 100, completion_tokens
 # decompose_query tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_decompose_query_returns_valid_plan() -> None:
     """decompose_query with valid LLM JSON returns state with list[TaskPlan]."""
-    valid_plan_json = json.dumps({
-        "tasks": [
-            {"agent_type": "search", "description": "Find recent LLM reasoning papers", "depends_on": []},
-            {"agent_type": "memory_read", "description": "Check prior research context", "depends_on": ["0", "1"]},
-        ]
-    })
+    valid_plan_json = json.dumps(
+        {
+            "tasks": [
+                {
+                    "agent_type": "search",
+                    "description": "Find recent LLM reasoning papers",
+                    "depends_on": [],
+                },
+                {
+                    "agent_type": "memory_read",
+                    "description": "Check prior research context",
+                    "depends_on": ["0", "1"],
+                },
+            ]
+        }
+    )
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(
@@ -101,11 +108,17 @@ async def test_decompose_query_returns_valid_plan() -> None:
 @pytest.mark.asyncio
 async def test_decompose_query_updates_token_counts() -> None:
     """decompose_query accumulates prompt and completion tokens on state."""
-    valid_plan_json = json.dumps({
-        "tasks": [
-            {"agent_type": "tool", "description": "Calculate compound interest", "depends_on": []}
-        ]
-    })
+    valid_plan_json = json.dumps(
+        {
+            "tasks": [
+                {
+                    "agent_type": "tool",
+                    "description": "Calculate compound interest",
+                    "depends_on": [],
+                }
+            ]
+        }
+    )
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(
@@ -128,11 +141,9 @@ async def test_decompose_query_updates_token_counts() -> None:
 @pytest.mark.asyncio
 async def test_decompose_query_publishes_kafka_event() -> None:
     """decompose_query calls _publish_thought_event once."""
-    valid_plan_json = json.dumps({
-        "tasks": [
-            {"agent_type": "search", "description": "Find info", "depends_on": []}
-        ]
-    })
+    valid_plan_json = json.dumps(
+        {"tasks": [{"agent_type": "search", "description": "Find info", "depends_on": []}]}
+    )
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(return_value=_mock_llm_response(valid_plan_json))
@@ -145,6 +156,7 @@ async def test_decompose_query_publishes_kafka_event() -> None:
         patch("nodes.decompose_query.insert_task_plan", new_callable=AsyncMock),
     ):
         from nodes.decompose_query import decompose_query
+
         await decompose_query(_base_state())
 
     mock_publish.assert_awaited_once()
@@ -155,11 +167,9 @@ async def test_decompose_query_publishes_kafka_event() -> None:
 @pytest.mark.asyncio
 async def test_decompose_query_persists_task_plan_to_db() -> None:
     """decompose_query persists the generated task plan before dispatch."""
-    valid_plan_json = json.dumps({
-        "tasks": [
-            {"agent_type": "memory_write", "description": "Store memory", "depends_on": []}
-        ]
-    })
+    valid_plan_json = json.dumps(
+        {"tasks": [{"agent_type": "memory_write", "description": "Store memory", "depends_on": []}]}
+    )
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(return_value=_mock_llm_response(valid_plan_json))
@@ -171,6 +181,7 @@ async def test_decompose_query_persists_task_plan_to_db() -> None:
         patch("nodes.decompose_query.insert_task_plan", mock_insert),
     ):
         from nodes.decompose_query import decompose_query
+
         await decompose_query(_base_state())
 
     mock_insert.assert_awaited_once()
@@ -184,11 +195,9 @@ async def test_decompose_query_persists_task_plan_to_db() -> None:
 @pytest.mark.asyncio
 async def test_decompose_query_raises_on_invalid_agent_type() -> None:
     """decompose_query raises OrchestratorError when LLM returns unknown agent_type."""
-    bad_json = json.dumps({
-        "tasks": [
-            {"agent_type": "browser", "description": "Open Google", "depends_on": []}
-        ]
-    })
+    bad_json = json.dumps(
+        {"tasks": [{"agent_type": "browser", "description": "Open Google", "depends_on": []}]}
+    )
 
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock(return_value=_mock_llm_response(bad_json))
@@ -198,7 +207,7 @@ async def test_decompose_query_raises_on_invalid_agent_type() -> None:
         patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
         patch("nodes.decompose_query.insert_task_plan", new_callable=AsyncMock),
     ):
-        from nodes.decompose_query import decompose_query, OrchestratorError
+        from nodes.decompose_query import OrchestratorError, decompose_query
 
         with pytest.raises(OrchestratorError, match="invalid task plan JSON"):
             await decompose_query(_base_state())
@@ -217,7 +226,7 @@ async def test_decompose_query_raises_on_empty_plan() -> None:
         patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
         patch("nodes.decompose_query.insert_task_plan", new_callable=AsyncMock),
     ):
-        from nodes.decompose_query import decompose_query, OrchestratorError
+        from nodes.decompose_query import OrchestratorError, decompose_query
 
         with pytest.raises(OrchestratorError, match="1–6 tasks"):
             await decompose_query(_base_state())
@@ -226,6 +235,7 @@ async def test_decompose_query_raises_on_empty_plan() -> None:
 # ---------------------------------------------------------------------------
 # synthesize_output tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_synthesize_output_sets_final_output() -> None:
@@ -265,9 +275,7 @@ async def test_synthesize_output_sets_final_output() -> None:
 async def test_synthesize_output_publishes_kafka_event() -> None:
     """synthesize_output calls _publish_llm_response_event once with run_id."""
     mock_provider = AsyncMock()
-    mock_provider.complete = AsyncMock(
-        return_value=_mock_llm_response("Final answer here.")
-    )
+    mock_provider.complete = AsyncMock(return_value=_mock_llm_response("Final answer here."))
     mock_publish = AsyncMock()
 
     with (
@@ -275,6 +283,7 @@ async def test_synthesize_output_publishes_kafka_event() -> None:
         patch("nodes.synthesize_output._publish_llm_response_event", mock_publish),
     ):
         from nodes.synthesize_output import synthesize_output
+
         await synthesize_output(_base_state())
 
     mock_publish.assert_awaited_once()
@@ -291,15 +300,17 @@ async def test_synthesize_output_raises_on_empty_llm_response() -> None:
         patch("nodes.synthesize_output.get_llm_provider", return_value=mock_provider),
         patch("nodes.synthesize_output._publish_llm_response_event", new_callable=AsyncMock),
     ):
-        from nodes.synthesize_output import synthesize_output
         from nodes.decompose_query import OrchestratorError
+        from nodes.synthesize_output import synthesize_output
 
         with pytest.raises(OrchestratorError, match="empty final_output"):
             await synthesize_output(_base_state())
 
+
 # ---------------------------------------------------------------------------
 # validate_plan tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_validate_plan_empty_plan_returns_error() -> None:
@@ -316,10 +327,16 @@ async def test_validate_plan_invalid_agent_type_returns_error() -> None:
     """validate_plan with unknown agent_type sets error."""
     from nodes.validate_plan import validate_plan
 
-    bad_plan = [{
-        "task_id": "t1", "agent_type": "browser",
-        "task_type": "browser", "agent_url": "", "input": {}, "depends_on": [],
-    }]
+    bad_plan = [
+        {
+            "task_id": "t1",
+            "agent_type": "browser",
+            "task_type": "browser",
+            "agent_url": "",
+            "input": {},
+            "depends_on": [],
+        }
+    ]
     result = await validate_plan(_base_state(task_plan=bad_plan))
     assert "error" in result
     assert "browser" in result["error"]
@@ -331,10 +348,22 @@ async def test_validate_plan_cycle_returns_error() -> None:
     from nodes.validate_plan import validate_plan
 
     cyclic_plan = [
-        {"task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "", "input": {}, "depends_on": ["1"]},
-        {"task_id": "t2", "agent_type": "tool", "task_type": "tool",
-        "agent_url": "", "input": {}, "depends_on": ["0"]},
+        {
+            "task_id": "t1",
+            "agent_type": "search",
+            "task_type": "search",
+            "agent_url": "",
+            "input": {},
+            "depends_on": ["1"],
+        },
+        {
+            "task_id": "t2",
+            "agent_type": "tool",
+            "task_type": "tool",
+            "agent_url": "",
+            "input": {},
+            "depends_on": ["0"],
+        },
     ]
     result = await validate_plan(_base_state(task_plan=cyclic_plan))
     assert "error" in result
@@ -347,10 +376,22 @@ async def test_validate_plan_valid_returns_empty_dict() -> None:
     from nodes.validate_plan import validate_plan
 
     valid_plan = [
-        {"task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": []},
-        {"task_id": "t2", "agent_type": "tool", "task_type": "tool",
-        "agent_url": "http://nexus-tool-agent:8005", "input": {}, "depends_on": ["0"]},
+        {
+            "task_id": "t1",
+            "agent_type": "search",
+            "task_type": "search",
+            "agent_url": "http://nexus-search-agent:8002",
+            "input": {},
+            "depends_on": [],
+        },
+        {
+            "task_id": "t2",
+            "agent_type": "tool",
+            "task_type": "tool",
+            "agent_url": "http://nexus-tool-agent:8005",
+            "input": {},
+            "depends_on": ["0"],
+        },
     ]
     result = await validate_plan(_base_state(task_plan=valid_plan))
     assert result["task_plan"] == valid_plan
@@ -360,16 +401,24 @@ async def test_validate_plan_valid_returns_empty_dict() -> None:
 # dispatch_next_task tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_dispatch_next_task_posts_to_correct_url() -> None:
     """dispatch_next_task POSTs to the agent URL and sets pending_task."""
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from nodes.dispatch_next_task import dispatch_next_task
 
-    task_plan = [{
-        "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://nexus-search-agent:8002", "input": {"query": "test"}, "depends_on": [],
-    }]
+    task_plan = [
+        {
+            "task_id": "t1",
+            "agent_type": "search",
+            "task_type": "search",
+            "agent_url": "http://nexus-search-agent:8002",
+            "input": {"query": "test"},
+            "depends_on": [],
+        }
+    ]
 
     mock_response = MagicMock()
     mock_response.json.return_value = {"output": {"results": ["r1"]}, "error": None}
@@ -398,13 +447,20 @@ async def test_dispatch_next_task_posts_to_correct_url() -> None:
 async def test_dispatch_next_task_timeout_sets_error() -> None:
     """dispatch_next_task on timeout sets state error."""
     from unittest.mock import AsyncMock, patch
+
     import httpx
     from nodes.dispatch_next_task import dispatch_next_task
 
-    task_plan = [{
-        "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": [],
-    }]
+    task_plan = [
+        {
+            "task_id": "t1",
+            "agent_type": "search",
+            "task_type": "search",
+            "agent_url": "http://nexus-search-agent:8002",
+            "input": {},
+            "depends_on": [],
+        }
+    ]
 
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -425,15 +481,37 @@ async def test_dispatch_next_task_timeout_sets_error() -> None:
 async def test_dispatch_next_task_skips_completed() -> None:
     """dispatch_next_task skips tasks already in completed_tasks."""
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from nodes.dispatch_next_task import dispatch_next_task
 
     task_plan = [
-        {"task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": []},
-        {"task_id": "t2", "agent_type": "tool", "task_type": "tool",
-        "agent_url": "http://nexus-tool-agent:8005", "input": {}, "depends_on": []},
+        {
+            "task_id": "t1",
+            "agent_type": "search",
+            "task_type": "search",
+            "agent_url": "http://nexus-search-agent:8002",
+            "input": {},
+            "depends_on": [],
+        },
+        {
+            "task_id": "t2",
+            "agent_type": "tool",
+            "task_type": "tool",
+            "agent_url": "http://nexus-tool-agent:8005",
+            "input": {},
+            "depends_on": [],
+        },
     ]
-    completed = [{"task_id": "t1", "agent_type": "search", "output": {}, "error": None, "duration_ms": 100, "attempt": 1}]
+    completed = [
+        {
+            "task_id": "t1",
+            "agent_type": "search",
+            "output": {},
+            "error": None,
+            "duration_ms": 100,
+            "attempt": 1,
+        }
+    ]
 
     mock_response = MagicMock()
     mock_response.json.return_value = {"output": {}, "error": None}
@@ -448,7 +526,9 @@ async def test_dispatch_next_task_skips_completed() -> None:
         patch("nodes.dispatch_next_task.httpx.AsyncClient", return_value=mock_client),
         patch("nodes.dispatch_next_task.task_exists", AsyncMock(return_value=True)),
     ):
-        result = await dispatch_next_task(_base_state(task_plan=task_plan, completed_tasks=completed))
+        result = await dispatch_next_task(
+            _base_state(task_plan=task_plan, completed_tasks=completed)
+        )
 
     assert result["pending_task"]["task_id"] == "t2"
     call_url = mock_client.post.call_args[0][0]
@@ -459,12 +539,19 @@ async def test_dispatch_next_task_skips_completed() -> None:
 async def test_dispatch_next_task_fails_when_task_missing_in_db() -> None:
     """dispatch_next_task fails immediately if the task_id is missing from Postgres."""
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from nodes.dispatch_next_task import dispatch_next_task
 
-    task_plan = [{
-        "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://nexus-search-agent:8002", "input": {"query": "test"}, "depends_on": [],
-    }]
+    task_plan = [
+        {
+            "task_id": "t1",
+            "agent_type": "search",
+            "task_type": "search",
+            "agent_url": "http://nexus-search-agent:8002",
+            "input": {"query": "test"},
+            "depends_on": [],
+        }
+    ]
 
     mock_client = AsyncMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
@@ -480,9 +567,12 @@ async def test_dispatch_next_task_fails_when_task_missing_in_db() -> None:
     assert "error" in result
     assert "does not exist" in result["error"]
     mock_client.post.assert_not_awaited()
+
+
 # ---------------------------------------------------------------------------
 # await_task_result tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_await_task_result_normalises_success_response() -> None:
@@ -490,10 +580,15 @@ async def test_await_task_result_normalises_success_response() -> None:
     from nodes.await_task_result import await_task_result
 
     pending = {
-        "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": [],
+        "task_id": "t1",
+        "agent_type": "search",
+        "task_type": "search",
+        "agent_url": "http://nexus-search-agent:8002",
+        "input": {},
+        "depends_on": [],
         "_response": {"output": {"results": ["r1"]}, "error": None},
-        "_elapsed_ms": 1200, "_attempt": 1,
+        "_elapsed_ms": 1200,
+        "_attempt": 1,
     }
     result = await await_task_result(_base_state(pending_task=pending))
 
@@ -509,10 +604,15 @@ async def test_await_task_result_propagates_agent_error() -> None:
     from nodes.await_task_result import await_task_result
 
     pending = {
-        "task_id": "t1", "agent_type": "search", "task_type": "search",
-        "agent_url": "http://nexus-search-agent:8002", "input": {}, "depends_on": [],
+        "task_id": "t1",
+        "agent_type": "search",
+        "task_type": "search",
+        "agent_url": "http://nexus-search-agent:8002",
+        "input": {},
+        "depends_on": [],
         "_response": {"output": None, "error": "search API unavailable"},
-        "_elapsed_ms": 500, "_attempt": 1,
+        "_elapsed_ms": 500,
+        "_attempt": 1,
     }
     result = await await_task_result(_base_state(pending_task=pending))
 
@@ -524,15 +624,21 @@ async def test_await_task_result_propagates_agent_error() -> None:
 # record_result tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_record_result_appends_to_completed_tasks() -> None:
     """record_result appends task_result and clears pending_task."""
-    from unittest.mock import patch, AsyncMock
+    from unittest.mock import AsyncMock, patch
+
     from nodes.record_result import record_result
 
     task_result = {
-        "task_id": "t1", "agent_type": "search", "output": {"results": []},
-        "error": None, "duration_ms": 1000, "attempt": 1,
+        "task_id": "t1",
+        "agent_type": "search",
+        "output": {"results": []},
+        "error": None,
+        "duration_ms": 1000,
+        "attempt": 1,
     }
 
     with patch("nodes.record_result.get_db_engine", return_value=None):  # skip DB
@@ -548,6 +654,7 @@ async def test_record_result_appends_to_completed_tasks() -> None:
 async def test_record_result_executes_db_update() -> None:
     """record_result calls AsyncSession.execute with UPDATE when engine is set."""
     from unittest.mock import AsyncMock, MagicMock, patch
+
     from nodes.record_result import record_result
 
     mock_session = AsyncMock()
@@ -560,8 +667,12 @@ async def test_record_result_executes_db_update() -> None:
     mock_engine = MagicMock()
 
     task_result = {
-        "task_id": "t1", "agent_type": "search", "output": {},
-        "error": None, "duration_ms": 500, "attempt": 1,
+        "task_id": "t1",
+        "agent_type": "search",
+        "output": {},
+        "error": None,
+        "duration_ms": 500,
+        "attempt": 1,
     }
 
     with (
@@ -578,10 +689,12 @@ async def test_record_result_executes_db_update() -> None:
 # finalize_run tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_finalize_run_sets_completed_status() -> None:
     """finalize_run returns status=completed when no error in state."""
-    from unittest.mock import patch, AsyncMock, MagicMock
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     from nodes.finalize_run import finalize_run
 
     mock_session = AsyncMock()
@@ -607,7 +720,8 @@ async def test_finalize_run_sets_completed_status() -> None:
 @pytest.mark.asyncio
 async def test_finalize_run_sets_failed_status_on_error() -> None:
     """finalize_run returns status=failed when state has error."""
-    from unittest.mock import patch, AsyncMock, MagicMock
+    from unittest.mock import AsyncMock, MagicMock, patch
+
     from nodes.finalize_run import finalize_run
 
     mock_engine = MagicMock()
@@ -615,10 +729,17 @@ async def test_finalize_run_sets_failed_status_on_error() -> None:
     with (
         patch("nodes.finalize_run.get_db_engine", return_value=mock_engine),
         patch("nodes.record_result.get_db_engine", return_value=mock_engine),
-        patch("nodes.finalize_run.async_sessionmaker", return_value=MagicMock(return_value=AsyncMock(
-            __aenter__=AsyncMock(return_value=AsyncMock(execute=AsyncMock(), commit=AsyncMock())),
-            __aexit__=AsyncMock(return_value=False),
-        ))),
+        patch(
+            "nodes.finalize_run.async_sessionmaker",
+            return_value=MagicMock(
+                return_value=AsyncMock(
+                    __aenter__=AsyncMock(
+                        return_value=AsyncMock(execute=AsyncMock(), commit=AsyncMock())
+                    ),
+                    __aexit__=AsyncMock(return_value=False),
+                )
+            ),
+        ),
         patch("nodes.finalize_run._publish_run_event", new_callable=AsyncMock),
     ):
         result = await finalize_run(_base_state(error="LLM provider failed"))

@@ -28,6 +28,7 @@ async def test_run_graph_increments_active_runs_on_start() -> None:
         patch("main.orchestrator_runs_total", mock_orchestrator_runs),
     ):
         from main import _run_graph
+
         await _run_graph(mock_graph, {"run_id": "r1"}, "r1")
 
     mock_active_runs.labels(service="orchestrator").inc.assert_called_once()
@@ -47,6 +48,7 @@ async def test_run_graph_decrements_active_runs_on_completion() -> None:
         patch("main.orchestrator_runs_total", mock_orchestrator_runs),
     ):
         from main import _run_graph
+
         await _run_graph(mock_graph, {"run_id": "r1"}, "r1")
 
     mock_active_runs.labels(service="orchestrator").dec.assert_called_once()
@@ -66,6 +68,7 @@ async def test_run_graph_decrements_active_runs_on_exception() -> None:
         patch("main.orchestrator_runs_total", mock_orchestrator_runs),
     ):
         from main import _run_graph
+
         await _run_graph(mock_graph, {"run_id": "r1"}, "r1")
 
     mock_active_runs.labels(service="orchestrator").dec.assert_called_once()

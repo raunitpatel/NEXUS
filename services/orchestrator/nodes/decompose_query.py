@@ -9,6 +9,7 @@ The plan is validated by Pydantic before being written to state.
 A Kafka event is published to nexus.events so the SSE emitter can stream
 the planning thought to the frontend in real time.
 """
+
 from __future__ import annotations
 
 import json
@@ -16,18 +17,18 @@ import uuid
 from typing import Any
 
 import structlog
-from pydantic import BaseModel, ValidationError, field_validator
-
 from llm_provider import LLMProviderError, get_llm_provider
-from state import AgentType, OrchestratorState, TaskPlan
+from pydantic import BaseModel, ValidationError, field_validator
+from sse_emitter import emit_event
+from state import OrchestratorState, TaskPlan
+
 from nodes import get_redis_client
 from nodes.task_persistence import insert_task_plan
-from sse_emitter import emit_event
- 
+
 logger = structlog.get_logger(__name__)
- 
+
 # Pydantic model for LLM response validation
- 
+
 _VALID_AGENT_TYPES: set[str] = {
     "search",
     "code",
@@ -35,15 +36,15 @@ _VALID_AGENT_TYPES: set[str] = {
     "memory_write",
     "tool",
 }
- 
- 
+
+
 class _TaskPlanItem(BaseModel):
     """Pydantic model used to validate a single task returned by the LLM."""
- 
+
     agent_type: str
     description: str
     depends_on: list[str] = []
- 
+
     @field_validator("agent_type")
     @classmethod
     def validate_agent_type(cls, v: str) -> str:
@@ -53,20 +54,20 @@ class _TaskPlanItem(BaseModel):
                 f"Invalid agent_type '{v}'. Must be one of: {sorted(_VALID_AGENT_TYPES)}"
             )
         return v
- 
- 
+
+
 class _DecomposeResponse(BaseModel):
     """Root wrapper expected from the LLM — either a bare list or {tasks: [...]}."""
- 
+
     tasks: list[_TaskPlanItem]
- 
- 
+
+
 # System prompt
- 
+
 _DECOMPOSE_SYSTEM_PROMPT = """\
 You are the planning component of NEXUS, an AI agent orchestration platform.
 Your job is to decompose a user query into a structured list of agent tasks.
- 
+
 Available agent types and their capabilities:
 - search: Web search, document retrieval, fact-finding
 - code: Write, execute, and debug Python code
@@ -103,37 +104,36 @@ Example output:
     ]
 }
 """
- 
- 
+
+
 # Node function
- 
+
+
 async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
     """
     LangGraph node that decomposes the user query into a list[TaskPlan].
- 
+
     Calls the configured LLMProvider in JSON mode, validates the response with
     Pydantic, assigns deterministic task IDs, resolves agent URLs, and publishes
     a Kafka thought event.
- 
+
     Args:
         state: Current OrchestratorState. Reads: run_id, user_id, query,
             input_tokens, output_tokens.
- 
+
     Returns:
         Partial state dict with keys: task_plan, input_tokens, output_tokens.
- 
+
     Raises:
         OrchestratorError: If the LLM returns an invalid plan or provider fails.
     """
     run_id = state["run_id"]
     query = state["query"]
- 
+
     logger.info("decompose_query.start", run_id=run_id, query=query[:100])
 
     # Emit run_start immediately so the SSE client knows the run is live
     try:
-        from config import settings as _settings
-        import redis.asyncio as _aioredis
         # Note: nodes don't have direct access to app.state — we use a module-level
         # redis client reference set by main.py lifespan (same pattern as _db_engine)
         _redis_client = get_redis_client()
@@ -153,9 +153,9 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
             )
     except Exception as _exc:
         logger.warning("decompose_query.emit_run_start_failed", run_id=run_id, error=str(_exc))
- 
+
     provider = get_llm_provider()
- 
+
     try:
         llm_response = await provider.complete(
             system=_DECOMPOSE_SYSTEM_PROMPT,
@@ -165,7 +165,7 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
     except LLMProviderError as exc:
         logger.error("decompose_query.provider_error", run_id=run_id, error=str(exc))
         raise OrchestratorError(f"LLM provider failed during decompose: {exc}") from exc
- 
+
     # Parse and validate LLM JSON output
     try:
         raw = json.loads(llm_response.content)
@@ -179,42 +179,38 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
             raw_content=llm_response.content,
             error=str(exc),
         )
-        raise OrchestratorError(
-            f"LLM returned invalid task plan JSON: {exc}"
-        ) from exc
- 
+        raise OrchestratorError(f"LLM returned invalid task plan JSON: {exc}") from exc
+
     tasks = decompose_response.tasks
- 
+
     if not (1 <= len(tasks) <= 6):
-        raise OrchestratorError(
-            f"Plan must contain 1–6 tasks, got {len(tasks)}."
-        )
- 
+        raise OrchestratorError(f"Plan must contain 1–6 tasks, got {len(tasks)}.")
+
     # Lazy import to avoid module-level circular dependency:
     # decompose_query → dispatch_next_task → (config, state) — all fine at runtime
     # but importing at module level would create an import-time cycle because
     # dispatch_next_task also imports from decompose_query (OrchestratorError).
     # The lazy import here executes after all modules are loaded. ✓
     from nodes.dispatch_next_task import _resolve_agent_url
- 
+
     plan: list[TaskPlan] = []
     for task in tasks:
         try:
             agent_url = _resolve_agent_url(task.agent_type)
         except ValueError:
             agent_url = ""  # validate_plan will catch unknown agent types
- 
+
         plan.append(
             TaskPlan(
                 task_id=str(uuid.uuid4()),
-                agent_type=task.agent_type,      # type: ignore[arg-type]
-                task_type=task.agent_type,        # type: ignore[arg-type]
+                agent_type=task.agent_type,  # type: ignore[arg-type]
+                task_type=task.agent_type,  # type: ignore[arg-type]
                 agent_url=agent_url,
                 input={"query": query, "description": task.description},
                 depends_on=task.depends_on,
             )
         )
- 
+
     logger.info(
         "decompose_query.success",
         run_id=run_id,
@@ -223,7 +219,7 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
     )
 
     await insert_task_plan(run_id=run_id, task_plan=plan)
- 
+
     await _publish_thought_event(
         run_id=run_id,
         content=(
@@ -239,7 +235,7 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
                 agent_name="orchestrator.decompose_query",
                 payload={
                     "content": f"Decomposed into {len(plan)} task(s): "
-                            + ", ".join(t["agent_type"] for t in plan),
+                    + ", ".join(t["agent_type"] for t in plan),
                     "task_count": len(plan),
                 },
                 redis_client=_redis_client,
@@ -253,16 +249,17 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
         "input_tokens": (state.get("input_tokens") or 0) + (llm_response.prompt_tokens or 0),
         "output_tokens": (state.get("output_tokens") or 0) + (llm_response.completion_tokens or 0),
     }
- 
- 
+
+
 # Helpers
- 
+
+
 async def _publish_thought_event(run_id: str, content: str) -> None:
     """
     Publish a thought event to the nexus.events Kafka topic.
- 
+
     Failures are logged and swallowed — Kafka publish must not abort a run.
- 
+
     Args:
         run_id: The orchestration run ID.
         content: Human-readable thought string.
@@ -270,7 +267,7 @@ async def _publish_thought_event(run_id: str, content: str) -> None:
     from config import settings
     from shared.kafka_client import KafkaProducerFactory
     from shared.kafka_schemas import EventMessage
- 
+
     try:
         producer = await KafkaProducerFactory.get_producer(
             bootstrap_servers=settings.kafka_bootstrap_servers
@@ -291,10 +288,10 @@ async def _publish_thought_event(run_id: str, content: str) -> None:
             run_id=run_id,
             error=str(exc),
         )
- 
- 
+
+
 # Shared exception — imported by synthesize_output and other nodes
- 
+
+
 class OrchestratorError(Exception):
     """Raised by orchestrator nodes to signal a recoverable or fatal run failure."""
- 

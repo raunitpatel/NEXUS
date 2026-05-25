@@ -14,13 +14,14 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from llm_provider import LLMResponse
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
-def _mock_llm_response(content: str, prompt_tokens: int = 100, completion_tokens: int = 50) -> MagicMock:
+
+def _mock_llm_response(
+    content: str, prompt_tokens: int = 100, completion_tokens: int = 50
+) -> MagicMock:
     r = MagicMock()
     r.content = content
     r.prompt_tokens = prompt_tokens
@@ -36,6 +37,7 @@ def _mock_llm_response_cached(content: str) -> MagicMock:
 
 
 # ── CachedLLMProvider tests ───────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_cached_provider_cache_miss_calls_provider() -> None:
@@ -72,7 +74,9 @@ async def test_cached_provider_cache_hit_skips_provider() -> None:
     """On cache hit, CachedLLMProvider returns cached data without calling provider."""
     from cached_llm_provider import CachedLLMProvider
 
-    cached_data = json.dumps({"content": "cached result", "prompt_tokens": 10, "completion_tokens": 5})
+    cached_data = json.dumps(
+        {"content": "cached result", "prompt_tokens": 10, "completion_tokens": 5}
+    )
     mock_provider = AsyncMock()
     mock_provider.complete = AsyncMock()
 
@@ -145,25 +149,30 @@ async def test_cache_key_includes_model_and_prompts() -> None:
 
 # ── SearchAgent tests ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_search_agent_run_returns_summary() -> None:
     """SearchAgent.run() returns SearchAgentResult with non-empty summary."""
     from agent import SearchAgent
 
-    rerank_json = json.dumps([
-        {"index": 0, "score": 0.9},
-        {"index": 1, "score": 0.7},
-        {"index": 2, "score": 0.5},
-        {"index": 3, "score": 0.3},
-        {"index": 4, "score": 0.1},
-    ])
+    rerank_json = json.dumps(
+        [
+            {"index": 0, "score": 0.9},
+            {"index": 1, "score": 0.7},
+            {"index": 2, "score": 0.5},
+            {"index": 3, "score": 0.3},
+            {"index": 4, "score": 0.1},
+        ]
+    )
 
     mock_cached_provider = AsyncMock()
-    mock_cached_provider.complete = AsyncMock(side_effect=[
-        _mock_llm_response("LLM reasoning 2024"),             # formulate_query
-        _mock_llm_response(rerank_json),                       # rerank
-        _mock_llm_response("LLMs use chain-of-thought [1]."), # summarize
-    ])
+    mock_cached_provider.complete = AsyncMock(
+        side_effect=[
+            _mock_llm_response("LLM reasoning 2024"),  # formulate_query
+            _mock_llm_response(rerank_json),  # rerank
+            _mock_llm_response("LLMs use chain-of-thought [1]."),  # summarize
+        ]
+    )
 
     mock_redis = AsyncMock()
 
@@ -239,11 +248,13 @@ async def test_search_agent_publishes_agent_start_and_end_events() -> None:
 
     rerank_json = json.dumps([{"index": i, "score": 0.5} for i in range(5)])
     mock_cached_provider = AsyncMock()
-    mock_cached_provider.complete = AsyncMock(side_effect=[
-        _mock_llm_response("query"),
-        _mock_llm_response(rerank_json),
-        _mock_llm_response("summary"),
-    ])
+    mock_cached_provider.complete = AsyncMock(
+        side_effect=[
+            _mock_llm_response("query"),
+            _mock_llm_response(rerank_json),
+            _mock_llm_response("summary"),
+        ]
+    )
 
     publish_calls: list[str] = []
 
@@ -266,11 +277,13 @@ async def test_search_agent_rerank_parse_error_uses_default_score() -> None:
     from agent import SearchAgent
 
     mock_cached_provider = AsyncMock()
-    mock_cached_provider.complete = AsyncMock(side_effect=[
-        _mock_llm_response("query"),
-        _mock_llm_response("NOT VALID JSON"),   # rerank fails to parse
-        _mock_llm_response("summary"),
-    ])
+    mock_cached_provider.complete = AsyncMock(
+        side_effect=[
+            _mock_llm_response("query"),
+            _mock_llm_response("NOT VALID JSON"),  # rerank fails to parse
+            _mock_llm_response("summary"),
+        ]
+    )
 
     with (
         patch("agent.CachedLLMProvider", return_value=mock_cached_provider),
@@ -285,6 +298,7 @@ async def test_search_agent_rerank_parse_error_uses_default_score() -> None:
 
 
 # ── WebSearchTool tests ───────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_web_search_tool_returns_max_results() -> None:
@@ -323,17 +337,25 @@ async def test_web_search_tool_result_has_required_fields() -> None:
 
 # ── main.py endpoint tests ────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_run_endpoint_missing_query_returns_error() -> None:
     """POST /run with empty input.query returns RunResponse with error."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
-        response = client.post("/run", json={
-            "run_id": "r1", "task_id": "t1", "user_id": "u1",
-            "task_type": "search", "input": {}, "attempt": 1,
-        })
+        response = client.post(
+            "/run",
+            json={
+                "run_id": "r1",
+                "task_id": "t1",
+                "user_id": "u1",
+                "task_type": "search",
+                "input": {},
+                "attempt": 1,
+            },
+        )
 
     assert response.status_code == 200
     data = response.json()
@@ -344,8 +366,8 @@ async def test_run_endpoint_missing_query_returns_error() -> None:
 @pytest.mark.asyncio
 async def test_healthz_returns_ok() -> None:
     """GET /healthz returns 200 with status ok."""
-    from main import app
     from fastapi.testclient import TestClient
+    from main import app
 
     with TestClient(app) as client:
         response = client.get("/healthz")

@@ -12,7 +12,8 @@ Run:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, call, patch
+
 import pytest
 
 
@@ -20,6 +21,7 @@ def _reset_otel() -> None:
     """Reset OTel global state between tests to prevent cross-test pollution."""
     from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
+
     trace.set_tracer_provider(TracerProvider())
 
 
@@ -34,6 +36,7 @@ def test_configure_telemetry_sets_tracer_provider() -> None:
         patch("shared.telemetry._instrument_fastapi"),
     ):
         from shared.telemetry import configure_telemetry
+
         configure_telemetry(service_name="test-service", environment="development")
 
     provider = trace.get_tracer_provider()
@@ -50,10 +53,12 @@ def test_configure_telemetry_registers_w3c_propagator() -> None:
         patch("shared.telemetry._instrument_fastapi"),
     ):
         from shared.telemetry import configure_telemetry
+
         configure_telemetry(service_name="test-service", environment="production")
 
     from opentelemetry.propagate import get_global_textmap
     from opentelemetry.propagators.composite import CompositePropagator
+
     propagator = get_global_textmap()
     assert isinstance(propagator, CompositePropagator)
 
@@ -67,6 +72,7 @@ def test_configure_telemetry_jaeger_unavailable_does_not_raise() -> None:
         side_effect=Exception("Connection refused"),
     ):
         from shared.telemetry import configure_telemetry
+
         # Must not raise — service should start even if Jaeger is down
         configure_telemetry(
             service_name="test-service",
@@ -86,6 +92,7 @@ def test_configure_telemetry_instruments_fastapi_when_app_provided() -> None:
         patch("shared.telemetry._instrument_fastapi") as mock_instrument,
     ):
         from shared.telemetry import configure_telemetry
+
         configure_telemetry(
             service_name="test-service",
             environment="development",
@@ -105,6 +112,7 @@ def test_configure_telemetry_skips_fastapi_when_app_not_provided() -> None:
         patch("shared.telemetry._instrument_fastapi") as mock_instrument,
     ):
         from shared.telemetry import configure_telemetry
+
         configure_telemetry(service_name="test-service", environment="development")
 
     mock_instrument.assert_not_called()
@@ -121,6 +129,7 @@ def test_configure_telemetry_asyncpg_import_error_handled_gracefully() -> None:
         patch.dict("sys.modules", {"opentelemetry.instrumentation.asyncpg": None}),
     ):
         from shared.telemetry import configure_telemetry
+
         # Should complete without raising ImportError
         configure_telemetry(service_name="test-service", environment="development")
 
@@ -132,6 +141,7 @@ def test_instrument_fastapi_calls_instrumentor_instrument_app() -> None:
     with patch("shared.telemetry.FastAPIInstrumentor") as mock_instrumentor_cls:
         # FastAPIInstrumentor is a class; instrument_app is a classmethod
         from shared.telemetry import _instrument_fastapi
+
         _instrument_fastapi(mock_app, "test-service")
 
     mock_instrumentor_cls.instrument_app.assert_called_once_with(mock_app)
@@ -158,6 +168,7 @@ def test_configure_telemetry_uses_correct_resource_attributes() -> None:
         patch("shared.telemetry._instrument_fastapi"),
     ):
         from shared.telemetry import configure_telemetry
+
         configure_telemetry(service_name="nexus-gateway", environment="production")
 
     assert len(captured_resources) == 1

@@ -44,8 +44,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from aiokafka.errors import KafkaConnectionError, KafkaTimeoutError
@@ -54,6 +55,7 @@ logger = logging.getLogger(__name__)
 
 
 # Serializers
+
 
 def _bytes_serializer(value: bytes | str | dict[str, Any]) -> bytes:
     """
@@ -94,6 +96,7 @@ def _bytes_deserializer(value: bytes) -> bytes:
 
 
 # Producer factory
+
 
 class KafkaProducerFactory:
     """
@@ -229,6 +232,7 @@ class KafkaProducerFactory:
 
 # Consumer factory
 
+
 class KafkaConsumerFactory:
     """
     Factory for creating per-call AIOKafkaConsumer instances.
@@ -316,6 +320,7 @@ class KafkaConsumerFactory:
 
 
 # Convenience publish helper
+
 
 async def publish_message(
     producer: AIOKafkaProducer,

@@ -22,21 +22,19 @@ import time
 from typing import Any
 
 import structlog
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
-
 from config import settings
 from llm_provider import LLMProviderError, ToolCallResult, get_llm_provider, get_tool_definitions
-from tools.calculator import CalculatorTool
-from tools.weather import WeatherTool
-from tools.wikipedia import WikipediaTool
-
 from shared.metrics import (
     agent_task_duration_seconds,
     agent_tasks_total,
-    llm_tokens_total,
     llm_requests_total,
+    llm_tokens_total,
 )
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from tools.calculator import CalculatorTool
+from tools.weather import WeatherTool
+from tools.wikipedia import WikipediaTool
 
 logger = structlog.get_logger(__name__)
 
@@ -188,9 +186,11 @@ class ToolAgent:
 
             agent_task_duration_seconds.labels(agent="tool", status="error").observe(elapsed / 1000)
             agent_tasks_total.labels(agent="tool", status="error").inc()
-            
+
             await self._publish_event(
-                run_id=run_id, task_id=task_id, event_type="agent_end",
+                run_id=run_id,
+                task_id=task_id,
+                event_type="agent_end",
                 payload={**result.to_dict(), "error": str(exc)},
             )
             return result
@@ -210,7 +210,9 @@ class ToolAgent:
                 duration_ms=elapsed,
             )
             await self._publish_event(
-                run_id=run_id, task_id=task_id, event_type="agent_end",
+                run_id=run_id,
+                task_id=task_id,
+                event_type="agent_end",
                 payload=result.to_dict(),
             )
             return result
@@ -270,7 +272,9 @@ class ToolAgent:
         )
 
         await self._publish_event(
-            run_id=run_id, task_id=task_id, event_type="agent_end",
+            run_id=run_id,
+            task_id=task_id,
+            event_type="agent_end",
             payload=result.to_dict(),
         )
 
@@ -291,20 +295,22 @@ class ToolAgent:
         ).inc()
         llm_tokens_total.labels(
             service="tool-agent",
-            model=settings.anthropic_model if settings.llm_provider == "claude" else settings.gemini_model,
+            model=settings.anthropic_model
+            if settings.llm_provider == "claude"
+            else settings.gemini_model,
             type="input",
         ).inc(result.tokens_used)
         llm_requests_total.labels(
             service="tool-agent",
-            model=settings.anthropic_model if settings.llm_provider == "claude" else settings.gemini_model,
+            model=settings.anthropic_model
+            if settings.llm_provider == "claude"
+            else settings.gemini_model,
             status="success" if not result.error else "error",
         ).inc()
 
         return result
 
-    async def _execute_tool(
-        self, tool_name: str, tool_input: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def _execute_tool(self, tool_name: str, tool_input: dict[str, Any]) -> dict[str, Any]:
         """
         Route to the correct tool implementation and execute it.
 
@@ -391,7 +397,9 @@ class ToolAgent:
                     },
                 )
                 await session.commit()
-            logger.info("tool_agent.tool_result_persisted", task_id=task_id, tool_name=schema_tool_name)
+            logger.info(
+                "tool_agent.tool_result_persisted", task_id=task_id, tool_name=schema_tool_name
+            )
         except Exception as exc:
             logger.error("tool_agent.persist_failed", task_id=task_id, error=str(exc))
 

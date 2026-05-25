@@ -24,18 +24,14 @@ import re
 import time
 from typing import Any
 
-from shared.metrics import (
-    agent_task_duration_seconds,
-    agent_tasks_total,
-    llm_tokens_total,
-    llm_requests_total,
-)
-
 import structlog
-
 from config import settings
 from executor import CodeExecutor, ExecutionResult
 from llm_provider import LLMProviderError, get_llm_provider
+from shared.metrics import (
+    agent_task_duration_seconds,
+    agent_tasks_total,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -255,7 +251,9 @@ class CodeAgent:
                     elapsed_ms=elapsed,
                 )
 
-                agent_task_duration_seconds.labels(agent="code", status="success").observe(elapsed / 1000)
+                agent_task_duration_seconds.labels(agent="code", status="success").observe(
+                    elapsed / 1000
+                )
                 agent_tasks_total.labels(agent="code", status="success").inc()
                 await self._publish_event(
                     run_id=run_id,
@@ -311,9 +309,7 @@ class CodeAgent:
         Raises:
             LLMProviderError: If the LLM call fails.
         """
-        user_msg = (
-            f"Write {language} code that fulfils this instruction:\n\n{instruction}"
-        )
+        user_msg = f"Write {language} code that fulfils this instruction:\n\n{instruction}"
         response = await self._provider.complete(
             system=_WRITE_CODE_SYSTEM,
             user=user_msg,

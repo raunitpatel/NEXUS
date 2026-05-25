@@ -1,10 +1,10 @@
 """
 Prometheus custom metric definitions shared across all NEXUS services.
- 
+
 Every service imports the metric objects it needs directly from this module.
 Metrics are registered with the default Prometheus registry on import —
 prometheus-fastapi-instrumentator then exposes them at GET /metrics.
- 
+
 Usage:
     from shared.metrics import (
         llm_tokens_total,
@@ -15,14 +15,14 @@ Usage:
         kafka_messages_consumed_total,
         sse_connections_active,
     )
- 
+
     # Increment a counter
     llm_tokens_total.labels(service="gateway", model="claude-sonnet-4-20250514", type="input").inc(150)
- 
+
     # Observe a histogram
     with agent_task_duration_seconds.labels(agent="search", status="success").time():
         result = await run_task()
- 
+
 All metric names follow the Prometheus convention:
   nexus_<subsystem>_<name>_<unit>
 """
@@ -68,7 +68,7 @@ agent_errors_total = Counter(
 agent_tasks_total = Counter(
     name="nexus_agent_tasks_total",
     documentation="Total number of agents tasks dispatched.",
-    labelnames=["agent", "status"],  
+    labelnames=["agent", "status"],
 )
 
 # Orchestrator / run metrics
@@ -140,10 +140,11 @@ redis_cache_misses_total = Counter(
     labelnames=["service"],
 )
 
+
 def configure_metrics() -> None:
     """
     No-op initialiser kept for API symmetry with configure_logging/configure_telemetry.
- 
+
     All metrics self-register with the default Prometheus registry on import.
     Call this in the service lifespan to make the import side-effects explicit
     and searchable in the codebase.

@@ -13,19 +13,19 @@ first request. Kafka consumer is launched as a background asyncio task.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
+from typing import Any
 
 import asyncpg
 import redis.asyncio as aioredis
 import structlog
-from fastapi import FastAPI
-from prometheus_fastapi_instrumentator import Instrumentator
-from pydantic import BaseModel
-
 from agent import MemoryAgent, run_kafka_consumer
 from config import settings
 from embeddings import EmbeddingModel
+from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
+from pydantic import BaseModel
 from shared.logging import configure_logging
 from shared.metrics import configure_metrics
 from shared.telemetry import configure_telemetry
@@ -91,6 +91,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 # ── Request / response models ─────────────────────────────────────────────────
 
+
 class RunRequest(BaseModel):
     """
     Payload for POST /run — matches dispatch_next_task HTTP contract.
@@ -130,6 +131,7 @@ class RunResponse(BaseModel):
 
 # ── App factory ───────────────────────────────────────────────────────────────
 
+
 def create_app() -> FastAPI:
     """
     Construct and configure the Memory Agent FastAPI application.
@@ -167,7 +169,6 @@ def create_app() -> FastAPI:
         Returns:
             RunResponse with output dict or error string.
         """
-        from fastapi import Request
         agent = MemoryAgent(
             db_pool=app.state.db_pool,
             redis_client=app.state.redis,
@@ -184,7 +185,9 @@ def create_app() -> FastAPI:
             if body.task_type == "memory_write":
                 content = body.input.get("content", "")
                 if not content:
-                    return RunResponse(output=None, error="input.content is required for memory_write")
+                    return RunResponse(
+                        output=None, error="input.content is required for memory_write"
+                    )
 
                 result = await agent.embed(
                     run_id=body.run_id,

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, AsyncMock
+from datetime import UTC, datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import status
@@ -26,7 +26,7 @@ TEST_ALGORITHM = "HS256"
 
 def _make_token(user_id: str, jti: str | None = None, expired: bool = False) -> str:
     jti = jti or str(uuid.uuid4())
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     delta = timedelta(seconds=-1) if expired else timedelta(hours=24)
     payload = {"sub": user_id, "jti": jti, "iat": now, "exp": now + delta}
     return jwt.encode(payload, TEST_SECRET, algorithm=TEST_ALGORITHM)
@@ -42,11 +42,13 @@ def _patch_settings(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # ── _validate_token tests ──────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_validate_token_valid_returns_user_id(monkeypatch: pytest.MonkeyPatch) -> None:
     """Valid JWT + live Redis session returns user_id string."""
     _patch_settings(monkeypatch)
     import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
 
@@ -67,6 +69,7 @@ async def test_validate_token_expired_raises_401(monkeypatch: pytest.MonkeyPatch
     """Expired JWT raises 401 HTTPException."""
     _patch_settings(monkeypatch)
     import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
 
@@ -87,6 +90,7 @@ async def test_validate_token_no_session_raises_401(monkeypatch: pytest.MonkeyPa
     """Valid JWT but missing Redis session raises 401."""
     _patch_settings(monkeypatch)
     import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
 
@@ -108,6 +112,7 @@ async def test_validate_token_redis_error_raises_503(monkeypatch: pytest.MonkeyP
     """Redis error during session check raises 503."""
     _patch_settings(monkeypatch)
     import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
 
@@ -125,6 +130,7 @@ async def test_validate_token_redis_error_raises_503(monkeypatch: pytest.MonkeyP
 
 
 # ── _verify_run_ownership tests ────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_verify_ownership_matching_user_passes() -> None:
@@ -211,6 +217,7 @@ async def test_verify_ownership_run_not_found_raises_404() -> None:
 
 # ── _proxy_stream tests ────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_proxy_stream_forwards_chunks() -> None:
     """_proxy_stream yields bytes from Orchestrator response."""
@@ -268,15 +275,20 @@ async def test_proxy_stream_orchestrator_down_yields_error_event() -> None:
 
 # ── stream_run endpoint smoke tests ───────────────────────────────────────────
 
+
 def test_stream_run_missing_token_returns_422() -> None:
     """GET /api/v1/sse/{run_id} without ?token= returns 422 (required query param)."""
     # Import after env patches to avoid settings validation errors
-    import importlib, config as cfg
+    import importlib
+
+    import config as cfg
+
     cfg.settings.jwt_secret_key = TEST_SECRET
     cfg.settings.jwt_algorithm = TEST_ALGORITHM
     cfg.settings.orchestrator_url = "http://orchestrator:8001"
 
     from main import app
+
     with TestClient(app) as client:
         response = client.get(f"/api/v1/sse/{uuid.uuid4()}")
 

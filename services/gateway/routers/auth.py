@@ -7,20 +7,20 @@ Provides:
 
 Both endpoints are exempt from AuthMiddleware (see middleware/auth.py _EXEMPT_PREFIXES).
 """
+
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import structlog
+from config import settings
+from dependencies import get_db_session, get_redis
 from fastapi import APIRouter, Depends, HTTPException, status
 from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from config import settings
-from dependencies import get_db_session, get_redis
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -29,6 +29,7 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Pydantic request / response models
 
+
 class RegisterRequest(BaseModel):
     """Payload for POST /api/v1/auth/register."""
 
@@ -36,12 +37,14 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
 
+
 class RegisterResponse(BaseModel):
     """Response returned on successful registration."""
 
     user_id: str
     display_name: str | None
     email: str
+
 
 class LoginRequest(BaseModel):
     """Payload for POST /api/v1/auth/login."""
@@ -57,9 +60,11 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int = settings.access_token_expire_seconds
 
+
 # Helper functions
 
-def _hash_password(plain: str)->str:
+
+def _hash_password(plain: str) -> str:
     """
     Hash a plaintext password using bcrypt.
 
@@ -71,7 +76,8 @@ def _hash_password(plain: str)->str:
     """
     return _pwd_context.hash(plain)
 
-def _verify_password(plain: str, hashed: str) ->bool:
+
+def _verify_password(plain: str, hashed: str) -> bool:
     """
     Verify a plaintext password against a bcrypt hash.
 
@@ -83,6 +89,7 @@ def _verify_password(plain: str, hashed: str) ->bool:
         True if the password matches, False otherwise.
     """
     return _pwd_context.verify(plain, hashed)
+
 
 def _create_access_token(user_id: str, display_name: str | None = None) -> tuple[str, str]:
     """
@@ -97,7 +104,7 @@ def _create_access_token(user_id: str, display_name: str | None = None) -> tuple
         used as the Redis session key suffix.
     """
     jti = str(uuid.uuid4())
-    now = datetime.now(tz=timezone.utc)
+    now = datetime.now(tz=UTC)
     expire = now + timedelta(seconds=settings.access_token_expire_seconds)
     payload = {
         "sub": user_id,
@@ -111,11 +118,13 @@ def _create_access_token(user_id: str, display_name: str | None = None) -> tuple
     token = jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
     return token, jti
 
+
 # Endpoints
+
 
 @router.post(
     "/register",
-    response_model = RegisterResponse,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new Nexus user account",
 )
@@ -149,10 +158,10 @@ async def register(
     existing = result.fetchone()
     if existing is not None:
         raise HTTPException(
-            status_code = status.HTTP_409_CONFLICT,
-            detail = "Email already registered",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered",
         )
-    
+
     # Insert new user
     user_id = str(uuid.uuid4())
     hashed = _hash_password(body.password)
@@ -169,16 +178,17 @@ async def register(
             "display_name": body.display_name,
             "email": body.email,
             "password_hash": hashed,
-        }
+        },
     )
     await db.commit()
 
     logger.info("auth.register_success", user_id=user_id, email=body.email)
     return RegisterResponse(user_id=user_id, display_name=body.display_name, email=body.email)
 
+
 @router.post(
     "/login",
-    response_model = TokenResponse,
+    response_model=TokenResponse,
     status_code=status.HTTP_200_OK,
     summary="Exchange credentials for a JWT access token",
 )
@@ -220,7 +230,7 @@ async def login(
             detail="Invalide email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Generate JWT, including the user's display name for client-side UI.
     token, jti = _create_access_token(user_id=str(row.id), display_name=row.display_name)
 
@@ -237,13 +247,6 @@ async def login(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Cache unavailable — login failed",
         )
-    
+
     logger.info("auth.login_success", user_id=str(row.id))
     return TokenResponse(access_token=token)
-
-
-
-
-
-
-

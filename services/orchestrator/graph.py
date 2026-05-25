@@ -12,7 +12,7 @@ Edge map:
     START ──► decompose_query ──► validate_plan
     validate_plan ──► (error or empty plan)  ──► handle_error
     validate_plan ──► (valid plan)           ──► dispatch_next_task
-    dispatch_next_task ──► (error)           ──► handle_error 
+    dispatch_next_task ──► (error)           ──► handle_error
     dispatch_next_task ──► (success)         ──► await_task_result
     await_task_result ──► (task error)       ──► handle_error
     await_task_result ──► (task ok)          ──► record_result
@@ -43,9 +43,9 @@ Diagram:
                                                     ↓
                                                 END
 """
-from langgraph.graph import END, START, StateGraph
 
 from config import settings
+from langgraph.graph import END, START, StateGraph
 from nodes.await_task_result import await_task_result
 from nodes.decompose_query import decompose_query
 from nodes.dispatch_next_task import dispatch_next_task
@@ -57,6 +57,7 @@ from nodes.validate_plan import validate_plan
 from state import OrchestratorState
 
 # Conditional edge routing functions
+
 
 def _route_after_validate(state: OrchestratorState) -> str:
     """
@@ -73,6 +74,7 @@ def _route_after_validate(state: OrchestratorState) -> str:
     if state.get("error") or not state.get("task_plan"):
         return "handle_error"
     return "dispatch_next_task"
+
 
 def _route_after_dispatch(state: OrchestratorState) -> str:
     """
@@ -91,6 +93,7 @@ def _route_after_dispatch(state: OrchestratorState) -> str:
     if state.get("error"):
         return "handle_error"
     return "await_task_result"
+
 
 def _route_after_await(state: OrchestratorState) -> str:
     """
@@ -124,6 +127,7 @@ def _route_after_record(state: OrchestratorState) -> str:
         return "dispatch_next_task"
     return "synthesize_output"
 
+
 def _route_after_error(state: OrchestratorState) -> str:
     """
     Route to dispatch_next_task if retries remain, otherwise finalize_run.
@@ -141,7 +145,9 @@ def _route_after_error(state: OrchestratorState) -> str:
         return "dispatch_next_task"
     return "finalize_run"
 
+
 # Graph factory
+
 
 def build_graph() -> object:
     """

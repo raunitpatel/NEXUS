@@ -11,7 +11,6 @@ import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from llm_provider import LLMResponse
 
 
@@ -31,11 +30,13 @@ async def test_search_agent_records_task_duration_on_success() -> None:
 
     rerank_json = json.dumps([{"index": i, "score": 0.5} for i in range(5)])
     mock_provider = AsyncMock()
-    mock_provider.complete = AsyncMock(side_effect=[
-        _mock_llm("query"),
-        _mock_llm(rerank_json),
-        _mock_llm("summary"),
-    ])
+    mock_provider.complete = AsyncMock(
+        side_effect=[
+            _mock_llm("query"),
+            _mock_llm(rerank_json),
+            _mock_llm("summary"),
+        ]
+    )
 
     mock_duration = MagicMock()
     mock_tasks_total = MagicMock()
