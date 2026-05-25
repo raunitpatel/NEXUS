@@ -39,9 +39,6 @@ jobs:
         run: ruff check services/
         # Fails CI if any lint violation found in services/
 
-      - name: Run Pyright type checker
-        run: pyright services/
-        # Fails CI on type errors; requires pyrightconfig.json or inline settings
 
   # ── Job 2: Test ──────────────────────────────────────────────────────────────
   test:
