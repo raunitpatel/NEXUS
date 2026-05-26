@@ -133,209 +133,209 @@ docker run -d `
     uvicorn main:app --host 0.0.0.0 --port 8001 --reload
 
 
-# =========================================================
-# Search Agent
-# =========================================================
+# # =========================================================
+# # Search Agent
+# # =========================================================
 
-Write-Host ""
-Write-Host "Preparing nexus-search-agent..." -ForegroundColor Yellow
+# Write-Host ""
+# Write-Host "Preparing nexus-search-agent..." -ForegroundColor Yellow
 
-$searchAgentImage = docker images -q nexus-search-agent
+# $searchAgentImage = docker images -q nexus-search-agent
 
-if (-not $searchAgentImage) {
+# if (-not $searchAgentImage) {
 
-    Write-Host "Building nexus-search-agent image..." -ForegroundColor Yellow
+#     Write-Host "Building nexus-search-agent image..." -ForegroundColor Yellow
 
-    docker build `
-        -f services/search_agent/Dockerfile `
-        -t nexus-search-agent .
+#     docker build `
+#         -f services/search_agent/Dockerfile `
+#         -t nexus-search-agent .
 
-} else {
+# } else {
 
-    Write-Host "nexus-search-agent image already exists. Skipping build." -ForegroundColor Green
-}
+#     Write-Host "nexus-search-agent image already exists. Skipping build." -ForegroundColor Green
+# }
 
-Write-Host "Running nexus-search-agent..." -ForegroundColor Yellow
+# Write-Host "Running nexus-search-agent..." -ForegroundColor Yellow
 
-docker rm -f nexus-search-agent 2>$null
+# docker rm -f nexus-search-agent 2>$null
 
-# -------------------------
-# Production
-# -------------------------
+# # -------------------------
+# # Production
+# # -------------------------
+
+# # docker run -d `
+# #     --name nexus-search-agent `
+# #     --network agent-net `
+# #     --env-file services/search_agent/.env `
+# #     -p 8002:8002 `
+# #     nexus-search-agent
+
+# # -------------------------
+# # Development
+# # -------------------------
 
 # docker run -d `
 #     --name nexus-search-agent `
 #     --network agent-net `
 #     --env-file services/search_agent/.env `
 #     -p 8002:8002 `
-#     nexus-search-agent
+#     -v "${PWD}/services/search_agent:/app" `
+#     -v "${PWD}/services/shared:/app/shared" `
+#     nexus-search-agent `
+#     uvicorn main:app --host 0.0.0.0 --port 8002 --reload
 
-# -------------------------
-# Development
-# -------------------------
+# # =========================================================
+# # Code Agent
+# # =========================================================
 
-docker run -d `
-    --name nexus-search-agent `
-    --network agent-net `
-    --env-file services/search_agent/.env `
-    -p 8002:8002 `
-    -v "${PWD}/services/search_agent:/app" `
-    -v "${PWD}/services/shared:/app/shared" `
-    nexus-search-agent `
-    uvicorn main:app --host 0.0.0.0 --port 8002 --reload
+# Write-Host ""
+# Write-Host "Preparing nexus-code-agent..." -ForegroundColor Yellow
 
-# =========================================================
-# Code Agent
-# =========================================================
+# $codeAgentImage = docker images -q nexus-code-agent
 
-Write-Host ""
-Write-Host "Preparing nexus-code-agent..." -ForegroundColor Yellow
+# if (-not $codeAgentImage) {
 
-$codeAgentImage = docker images -q nexus-code-agent
+#     docker build `
+#         -f services/code_agent/Dockerfile `
+#         -t nexus-code-agent .
+# } else {
 
-if (-not $codeAgentImage) {
+#     Write-Host "nexus-code-agent image already exists. Skipping build." -ForegroundColor Green
+# }
 
-    docker build `
-        -f services/code_agent/Dockerfile `
-        -t nexus-code-agent .
-} else {
+# Write-Host "Running nexus-code-agent..." -ForegroundColor Yellow
 
-    Write-Host "nexus-code-agent image already exists. Skipping build." -ForegroundColor Green
-}
+# docker rm -f nexus-code-agent 2>$null
 
-Write-Host "Running nexus-code-agent..." -ForegroundColor Yellow
+# # -------------------------
+# # Production
+# # -------------------------
 
-docker rm -f nexus-code-agent 2>$null
+# # docker run -d `
+# #     --name nexus-code-agent `
+# #     --network agent-net `
+# #     --env-file services/code_agent/.env `
+# #     -p 8003:8003 `
+# #     nexus-code-agent
 
-# -------------------------
-# Production
-# -------------------------
+# # -------------------------
+# # Development
+# # -------------------------
+
 
 # docker run -d `
 #     --name nexus-code-agent `
 #     --network agent-net `
 #     --env-file services/code_agent/.env `
 #     -p 8003:8003 `
-#     nexus-code-agent
+#     -v "${PWD}/services/code_agent:/app" `
+#     -v "${PWD}/services/shared:/app/shared" `
+#     nexus-code-agent `
+#     uvicorn main:app --host 0.0.0.0 --port 8003 --reload
 
-# -------------------------
-# Development
-# -------------------------
+# # =========================================================
+# # Memory Agent
+# # =========================================================
 
+# Write-Host ""
+# Write-Host "Preparing nexus-memory-agent..." -ForegroundColor Yellow
 
-docker run -d `
-    --name nexus-code-agent `
-    --network agent-net `
-    --env-file services/code_agent/.env `
-    -p 8003:8003 `
-    -v "${PWD}/services/code_agent:/app" `
-    -v "${PWD}/services/shared:/app/shared" `
-    nexus-code-agent `
-    uvicorn main:app --host 0.0.0.0 --port 8003 --reload
+# $memoryAgentImage = docker images -q nexus-memory-agent
 
-# =========================================================
-# Memory Agent
-# =========================================================
+# if (-not $memoryAgentImage) {
+#     Write-Host "Building nexus-memory-agent image..." -ForegroundColor Yellow
+#     docker build `
+#         -f services/memory_agent/Dockerfile `
+#         -t nexus-memory-agent .
+# } else {
+#     Write-Host "nexus-memory-agent image already exists. Skipping build." -ForegroundColor Green
+# }
 
-Write-Host ""
-Write-Host "Preparing nexus-memory-agent..." -ForegroundColor Yellow
+# Write-Host "Running nexus-memory-agent..." -ForegroundColor Yellow
+# docker rm -f nexus-memory-agent 2>$null
 
-$memoryAgentImage = docker images -q nexus-memory-agent
+# # -------------------------
+# # Production
+# # -------------------------
 
-if (-not $memoryAgentImage) {
-    Write-Host "Building nexus-memory-agent image..." -ForegroundColor Yellow
-    docker build `
-        -f services/memory_agent/Dockerfile `
-        -t nexus-memory-agent .
-} else {
-    Write-Host "nexus-memory-agent image already exists. Skipping build." -ForegroundColor Green
-}
+# # docker run -d `
+# #     --name nexus-memory-agent `
+# #     --network agent-net `
+# #     --env-file services/memory_agent/.env `
+# #     -p 8004:8004 `
+# #     nexus-memory-agent
 
-Write-Host "Running nexus-memory-agent..." -ForegroundColor Yellow
-docker rm -f nexus-memory-agent 2>$null
-
-# -------------------------
-# Production
-# -------------------------
+# # -------------------------
+# # Development
+# # -------------------------
 
 # docker run -d `
 #     --name nexus-memory-agent `
 #     --network agent-net `
 #     --env-file services/memory_agent/.env `
 #     -p 8004:8004 `
-#     nexus-memory-agent
+#     -v "${PWD}/services/memory_agent:/app" `
+#     -v "${PWD}/services/shared:/app/shared" `
+#     nexus-memory-agent `
+#     uvicorn main:app --host 0.0.0.0 --port 8004 --reload
 
-# -------------------------
-# Development
-# -------------------------
+# # =========================================================
+# # Tool Agent
+# # =========================================================
 
-docker run -d `
-    --name nexus-memory-agent `
-    --network agent-net `
-    --env-file services/memory_agent/.env `
-    -p 8004:8004 `
-    -v "${PWD}/services/memory_agent:/app" `
-    -v "${PWD}/services/shared:/app/shared" `
-    nexus-memory-agent `
-    uvicorn main:app --host 0.0.0.0 --port 8004 --reload
+# Write-Host ""
+# Write-Host "Preparing nexus-tool-agent..." -ForegroundColor Yellow
 
-# =========================================================
-# Tool Agent
-# =========================================================
+# $toolAgentImage = docker images -q nexus-tool-agent
 
-Write-Host ""
-Write-Host "Preparing nexus-tool-agent..." -ForegroundColor Yellow
+# if (-not $toolAgentImage) {
+#     Write-Host "Building nexus-tool-agent image..." -ForegroundColor Yellow
+#     docker build `
+#         -f services/tool_agent/Dockerfile `
+#         -t nexus-tool-agent .
+# } else {
+#     Write-Host "nexus-tool-agent image already exists. Skipping build." -ForegroundColor Green
+# }
 
-$toolAgentImage = docker images -q nexus-tool-agent
+# Write-Host "Running nexus-tool-agent..." -ForegroundColor Yellow
+# docker rm -f nexus-tool-agent 2>$null
 
-if (-not $toolAgentImage) {
-    Write-Host "Building nexus-tool-agent image..." -ForegroundColor Yellow
-    docker build `
-        -f services/tool_agent/Dockerfile `
-        -t nexus-tool-agent .
-} else {
-    Write-Host "nexus-tool-agent image already exists. Skipping build." -ForegroundColor Green
-}
+# # -------------------------
+# # Production
+# # -------------------------
 
-Write-Host "Running nexus-tool-agent..." -ForegroundColor Yellow
-docker rm -f nexus-tool-agent 2>$null
+# # docker run -d `
+# #     --name nexus-tool-agent `
+# #     --network tool-net `
+# #     --env-file services/tool_agent/.env `
+# #     -p 8005:8005 `
+# #     nexus-tool-agent
 
-# -------------------------
-# Production
-# -------------------------
-
+# # -------------------------
+# # Development
+# # -------------------------
 # docker run -d `
 #     --name nexus-tool-agent `
-#     --network tool-net `
+#     --network agent-net `
 #     --env-file services/tool_agent/.env `
 #     -p 8005:8005 `
-#     nexus-tool-agent
+#     -v "${PWD}/services/tool_agent:/app" `
+#     -v "${PWD}/services/shared:/app/shared" `
+#     nexus-tool-agent `
+#     uvicorn main:app --host 0.0.0.0 --port 8005 --reload
 
-# -------------------------
-# Development
-# -------------------------
-docker run -d `
-    --name nexus-tool-agent `
-    --network agent-net `
-    --env-file services/tool_agent/.env `
-    -p 8005:8005 `
-    -v "${PWD}/services/tool_agent:/app" `
-    -v "${PWD}/services/shared:/app/shared" `
-    nexus-tool-agent `
-    uvicorn main:app --host 0.0.0.0 --port 8005 --reload
+# # =========================================================
+# # Success Output
+# # =========================================================
 
-# =========================================================
-# Success Output
-# =========================================================
+# Write-Host ""
+# Write-Host "NEXUS services started." -ForegroundColor Green
 
-Write-Host ""
-Write-Host "NEXUS services started." -ForegroundColor Green
-
-Write-Host "  Gateway      : http://localhost:8000/docs" -ForegroundColor DarkGray
-Write-Host "  Orchestrator : http://localhost:8001/docs" -ForegroundColor DarkGray
-Write-Host "  Search Agent : http://localhost:8002/docs" -ForegroundColor DarkGray
-Write-Host "  Search Agent : http://localhost:8003/docs" -ForegroundColor DarkGray
-Write-Host "  Memory Agent : http://localhost:8004/docs" -ForegroundColor DarkGray
-Write-Host "  Tool Agent   : http://localhost:8005/docs" -ForegroundColor DarkGray
+# Write-Host "  Gateway      : http://localhost:8000/docs" -ForegroundColor DarkGray
+# Write-Host "  Orchestrator : http://localhost:8001/docs" -ForegroundColor DarkGray
+# Write-Host "  Search Agent : http://localhost:8002/docs" -ForegroundColor DarkGray
+# Write-Host "  Search Agent : http://localhost:8003/docs" -ForegroundColor DarkGray
+# Write-Host "  Memory Agent : http://localhost:8004/docs" -ForegroundColor DarkGray
+# Write-Host "  Tool Agent   : http://localhost:8005/docs" -ForegroundColor DarkGray
 
 
