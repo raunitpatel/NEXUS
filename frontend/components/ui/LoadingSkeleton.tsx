@@ -1,10 +1,14 @@
 import React from "react";
 
 /** Base shimmer block — all skeletons compose from this. */
-function Shimmer({ className }: { className?: string }): React.ReactElement {
+function Shimmer({
+  className,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>): React.ReactElement {
   return (
     <div
       className={`animate-pulse rounded bg-gray-200 dark:bg-gray-700 ${className ?? ""}`}
+      {...props}
     />
   );
 }
@@ -62,7 +66,7 @@ export function ChartSkeleton(): React.ReactElement {
           <Shimmer
             key={i}
             className="flex-1 rounded-t"
-            style={{ height: `${height}%` } as React.CSSProperties}
+            style={{ height: `${height}%` }}
           />
         ))}
       </div>
