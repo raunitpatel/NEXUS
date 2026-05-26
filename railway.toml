@@ -1,0 +1,44 @@
+[build]
+builder = "DOCKERFILE"
+
+[services.gateway]
+source = "."
+dockerfile = "services/gateway/Dockerfile"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+
+[services.orchestrator]
+source = "."
+dockerfile = "services/orchestrator/Dockerfile"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+
+[services.search-agent]
+source = "."
+dockerfile = "services/search_agent/Dockerfile"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+
+[services.code-agent]
+source = "."
+dockerfile = "services/code_agent/Dockerfile"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+
+[services.memory-agent]
+source = "."
+dockerfile = "services/memory_agent/Dockerfile"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 60
+
+[services.tool-agent]
+source = "."
+dockerfile = "services/tool_agent/Dockerfile"
+startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
