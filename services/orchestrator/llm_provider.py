@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 import anthropic
 import google.generativeai as genai
@@ -79,6 +79,15 @@ class LLMProvider(Protocol):
             LLMProviderError: On any provider-side failure
             (connection, timeout, bad response).
         """
+        ...
+
+    async def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        tools: list[dict[str, Any]],
+    ) -> ToolCallResult:
+        """Send completion with tool definitions and parse tool call response."""
         ...
 
 
@@ -211,6 +220,62 @@ class OllamaProvider:
             completion_tokens=completion_tokens,
         )
 
+    async def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        tools: list[dict[str, Any]],
+    ) -> ToolCallResult:
+        """
+        Fallback tool dispatch for non-Claude providers via JSON prompt engineering.
+
+        Instructs the LLM to respond with a JSON object specifying which tool to call.
+        Less reliable than native function calling — Claude is recommended for tool_agent.
+
+        Args:
+            system: System prompt.
+            user: User message.
+            tools: Tool definitions (used to build the prompt, not passed natively).
+
+        Returns:
+            ToolCallResult parsed from JSON response.
+        """
+        tool_list = "\n".join(f"- {t['name']}: {t['description']}" for t in tools)
+        tool_names = [t["name"] for t in tools]
+
+        augmented_system = (
+            f"{system}\n\n"
+            f"You have access to these tools:\n{tool_list}\n\n"
+            "IMPORTANT: Respond ONLY with a JSON object:\n"
+            '{"tool": "<tool_name>", "input": {<tool_input_fields>}}\n'
+            f"tool must be one of: {tool_names}. No prose, no markdown."
+        )
+
+        try:
+            llm_response = await self.complete(
+                system=augmented_system,
+                user=user,
+                json_mode=True,
+            )
+            raw = json.loads(llm_response.content)
+            return ToolCallResult(
+                tool_name=raw.get("tool"),
+                tool_input=raw.get("input", {}),
+                stop_reason="tool_use",
+                prompt_tokens=llm_response.prompt_tokens,
+                completion_tokens=llm_response.completion_tokens,
+            )
+        except (json.JSONDecodeError, KeyError):
+            # LLM failed to follow JSON format — return as plain answer
+            return ToolCallResult(
+                tool_name=None,
+                tool_input={},
+                stop_reason="end_turn",
+                prompt_tokens=0,
+                completion_tokens=0,
+                raw_text=llm_response.content if "llm_response" in dir() else "",
+            )
+
 
 # Gemini implementation
 class GeminiProvider:
@@ -283,6 +348,62 @@ class GeminiProvider:
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
         )
+
+    async def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        tools: list[dict[str, Any]],
+    ) -> ToolCallResult:
+        """
+        Fallback tool dispatch for non-Claude providers via JSON prompt engineering.
+
+        Instructs the LLM to respond with a JSON object specifying which tool to call.
+        Less reliable than native function calling — Claude is recommended for tool_agent.
+
+        Args:
+            system: System prompt.
+            user: User message.
+            tools: Tool definitions (used to build the prompt, not passed natively).
+
+        Returns:
+            ToolCallResult parsed from JSON response.
+        """
+        tool_list = "\n".join(f"- {t['name']}: {t['description']}" for t in tools)
+        tool_names = [t["name"] for t in tools]
+
+        augmented_system = (
+            f"{system}\n\n"
+            f"You have access to these tools:\n{tool_list}\n\n"
+            "IMPORTANT: Respond ONLY with a JSON object:\n"
+            '{"tool": "<tool_name>", "input": {<tool_input_fields>}}\n'
+            f"tool must be one of: {tool_names}. No prose, no markdown."
+        )
+
+        try:
+            llm_response = await self.complete(
+                system=augmented_system,
+                user=user,
+                json_mode=True,
+            )
+            raw = json.loads(llm_response.content)
+            return ToolCallResult(
+                tool_name=raw.get("tool"),
+                tool_input=raw.get("input", {}),
+                stop_reason="tool_use",
+                prompt_tokens=llm_response.prompt_tokens,
+                completion_tokens=llm_response.completion_tokens,
+            )
+        except (json.JSONDecodeError, KeyError):
+            # LLM failed to follow JSON format — return as plain answer
+            return ToolCallResult(
+                tool_name=None,
+                tool_input={},
+                stop_reason="end_turn",
+                prompt_tokens=0,
+                completion_tokens=0,
+                raw_text=llm_response.content if "llm_response" in dir() else "",
+            )
 
 
 # Claude implementation
@@ -363,6 +484,62 @@ class ClaudeProvider:
             completion_tokens=completion_tokens,
         )
 
+    async def complete_with_tools(
+        self,
+        system: str,
+        user: str,
+        tools: list[dict[str, Any]],
+    ) -> ToolCallResult:
+        """
+        Send a completion request with tool definitions and parse the tool call.
+
+        Args:
+            system: System prompt.
+            user: User message.
+            tools: List of tool definition dicts from get_tool_definitions().
+
+        Returns:
+            ToolCallResult with tool_name, tool_input, stop_reason, token counts.
+
+        Raises:
+            LLMProviderError: On API failure.
+        """
+        try:
+            response = await self._client.messages.create(
+                model=self._model,
+                max_tokens=1024,
+                system=system,
+                tools=tools,
+                messages=[{"role": "user", "content": user}],
+            )
+        except Exception as exc:
+            raise LLMProviderError("claude", f"Tool-use request failed: {exc}") from exc
+
+        prompt_tokens = getattr(response.usage, "input_tokens", 0) or 0
+        completion_tokens = getattr(response.usage, "output_tokens", 0) or 0
+        stop_reason = response.stop_reason or "end_turn"
+
+        # Extract tool call from content blocks
+        tool_name: str | None = None
+        tool_input: dict[str, Any] = {}
+        raw_text = ""
+
+        for block in response.content:
+            if block.type == "tool_use":
+                tool_name = block.name
+                tool_input = dict(block.input)
+            elif block.type == "text":
+                raw_text = block.text
+
+        return ToolCallResult(
+            tool_name=tool_name,
+            tool_input=tool_input,
+            stop_reason=stop_reason,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            raw_text=raw_text,
+        )
+
 
 def get_llm_provider() -> LLMProvider:
     """
@@ -405,3 +582,94 @@ def get_llm_provider() -> LLMProvider:
     raise ValueError(
         f"Unknown LLM_PROVIDER='{provider_name}'. Supported values: 'ollama', 'gemini', 'claude'."
     )
+
+
+@dataclass
+class ToolCallResult:
+    """
+    Normalized result of an LLM tool-use response.
+
+    Attributes:
+        tool_name: Name of the tool the LLM decided to call.
+        tool_input: Dict of arguments the LLM passed to the tool.
+        stop_reason: Why the LLM stopped generating ("tool_use", "end_turn", etc.)
+        prompt_tokens: Input tokens consumed.
+        completion_tokens: Output tokens consumed.
+        raw_text: Any text content the LLM emitted before the tool call.
+    """
+
+    tool_name: str | None
+    tool_input: dict[str, Any]
+    stop_reason: str
+    prompt_tokens: int
+    completion_tokens: int
+    raw_text: str = ""
+
+
+def get_tool_definitions() -> list[dict[str, Any]]:
+    """
+    Return the 3 NEXUS tool definitions in Anthropic tool-use schema format.
+
+    These are passed directly to the Anthropic messages.create() call as the
+    `tools` parameter. For Gemini and Ollama, the same definitions are adapted
+    to their respective function-calling schemas in the provider implementations.
+
+    Returns:
+        List of tool definition dicts, each with 'name', 'description', 'input_schema'.
+    """
+    return [
+        {
+            "name": "calculator",
+            "description": (
+                "Evaluate a mathematical expression and return the numeric result. "
+                "Use for any arithmetic: addition, subtraction, multiplication, division, "
+                "exponentiation, modulo. Input must be a valid arithmetic expression string."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "expression": {
+                        "type": "string",
+                        "description": "Arithmetic expression to evaluate, e.g. '137 * 42' or '(100 + 50) / 3'",
+                    }
+                },
+                "required": ["expression"],
+            },
+        },
+        {
+            "name": "get_weather",
+            "description": (
+                "Get the current weather conditions for a given city. "
+                "Returns temperature in Celsius, wind speed, and weather code. "
+                "Use for any weather, temperature, or climate question about a specific city."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "city": {
+                        "type": "string",
+                        "description": "City name to get weather for, e.g. 'London', 'Tokyo', 'New York'",
+                    }
+                },
+                "required": ["city"],
+            },
+        },
+        {
+            "name": "wikipedia_search",
+            "description": (
+                "Look up factual information about a topic, person, place, or event on Wikipedia. "
+                "Returns a concise summary of the Wikipedia article. "
+                "Use for questions about history, science, people, places, or general knowledge."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "Search query for Wikipedia, e.g. 'Hamlet Shakespeare' or 'Python programming language'",
+                    }
+                },
+                "required": ["query"],
+            },
+        },
+    ]

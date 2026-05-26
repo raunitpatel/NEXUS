@@ -191,12 +191,11 @@ async def decompose_query(state: OrchestratorState) -> dict[str, Any]:
     # but importing at module level would create an import-time cycle because
     # dispatch_next_task also imports from decompose_query (OrchestratorError).
     # The lazy import here executes after all modules are loaded. ✓
-    from nodes.dispatch_next_task import _resolve_agent_url
 
     plan: list[TaskPlan] = []
     for task in tasks:
         try:
-            agent_url = _resolve_agent_url(task.agent_type)
+            agent_url = ""
         except ValueError:
             agent_url = ""  # validate_plan will catch unknown agent types
 

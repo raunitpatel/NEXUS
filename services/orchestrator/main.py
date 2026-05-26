@@ -1,16 +1,15 @@
 """
 Orchestrator FastAPI application factory.
 
-Entry point for the orchestrator service. Compiles the LangGraph graph once
-at startup, stores it on app.state, and exposes POST /orchestrate which
-dispatches graph execution as a background asyncio task — returning
-{run_id, status: "running"} immediately to meet the 100ms latency requirement.
+Hybrid Railway architecture: agents are internal Python modules, not
+standalone services. The orchestrator is the only internal backend service.
 """
 
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+import asyncpg
 import redis.asyncio as aioredis
 import structlog
 from config import settings
@@ -26,16 +25,15 @@ from state import OrchestratorState
 
 logger = structlog.get_logger(__name__)
 
-# Lifespan
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """
     Manage startup and shutdown of shared orchestrator resources.
 
-    Compiles the LangGraph graph, initialises the async DB engine, and
-    connects to Redis on startup. Disposes all on shutdown.
+    In the hybrid architecture, also initialises:
+    - asyncpg pool for the memory agent (pgvector operations)
+    - Sets all shared state references used by internal agent modules
     """
     configure_logging(level=settings.log_level)
     configure_telemetry(
@@ -45,11 +43,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     configure_metrics()
 
-    # Compile LangGraph graph — done once at startup, never per-request
-    app.state.graph = build_graph
     app.state.graph = build_graph()
     logger.info("orchestrator.graph_compiled")
 
+    # SQLAlchemy async engine (used by orchestrator nodes + tool agent)
     engine: AsyncEngine = create_async_engine(
         settings.database_url,
         pool_size=settings.db_pool_size,
@@ -57,76 +54,69 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         pool_pre_ping=True,
     )
 
-    from nodes.db import set_db_engine as set_shared_db_engine
-
-    # Set the single shared DB engine for all orchestrator nodes
-    set_shared_db_engine(engine)
-    app.state.db_engine = engine
+    # asyncpg pool (used by memory agent's pgvector_store)
+    asyncpg_dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
+    db_pool: asyncpg.Pool = await asyncpg.create_pool(
+        asyncpg_dsn,
+        min_size=2,
+        max_size=10,
+        command_timeout=30,
+    )
 
     redis_client = aioredis.from_url(
         settings.redis_url,
         encoding="utf-8",
         decode_responses=False,
     )
-    app.state.redis = redis_client
 
+    # Wire shared state for nodes and internal agent modules
+    from nodes.app_state import set_db_engine, set_db_pool, set_redis_client as set_state_redis
+    from nodes.db import set_db_engine as set_node_db_engine
     from nodes import set_redis_client
 
+    set_db_engine(engine)
+    set_node_db_engine(engine)
+    set_db_pool(db_pool)
+    set_state_redis(redis_client)
     set_redis_client(redis_client)
-    logger.info("orchestrator.redis_wired_to_nodes")
 
-    logger.info("orchestrator.resources_ready")
+    app.state.db_engine = engine
+    app.state.db_pool = db_pool
+    app.state.redis = redis_client
+
+    # Pre-load sentence-transformers model so first memory request is fast
+    try:
+        from agents.memory_agent.embeddings import EmbeddingModel
+        EmbeddingModel()
+        logger.info("orchestrator.embedding_model_preloaded")
+    except Exception as exc:
+        logger.warning("orchestrator.embedding_model_preload_failed", error=str(exc))
+
+    logger.info("orchestrator.resources_ready", mode="hybrid_railway")
     yield
 
     logger.info("orchestrator.shutdown")
     await redis_client.aclose()
+    await db_pool.close()
     await engine.dispose()
 
 
-# Request / response models
-
-
 class OrchestrateRequest(BaseModel):
-    """
-    Payload for POST /orchestrate.
-
-    Attributes:
-        run_id: UUID of the runs row already written by the Gateway.
-        query: Raw user query string.
-        user_id: UUID of the authenticated user.
-    """
-
     run_id: str
     query: str
     user_id: str
 
 
 class OrchestrateResponse(BaseModel):
-    """
-    Response returned immediately from POST /orchestrate.
-
-    Graph runs asynchronously — response is sent before graph completes.
-
-    Attributes:
-        run_id: Echoed from the request.
-        status: Always 'running' for a successful dispatch.
-    """
-
     run_id: str
     status: str
 
 
 def create_app() -> FastAPI:
-    """
-    Construct and configure the orchestrator FastAPI application.
-
-    Returns:
-        Fully configured FastAPI instance.
-    """
     app = FastAPI(
         title="NEXUS Orchestrator",
-        description="LangGraph-powered multi-agent orchestration service.",
-        version="0.1.0",
+        description="LangGraph multi-agent orchestration — hybrid Railway architecture.",
+        version="0.2.0",
         lifespan=lifespan,
         docs_url="/docs" if settings.environment == "development" else None,
         redoc_url=None,
@@ -135,12 +125,12 @@ def create_app() -> FastAPI:
     Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
     from routers.sse import router as sse_router
-
     app.include_router(sse_router, tags=["sse"])
+    from routers import memory
+    app.include_router( memory.router, prefix="/memory", tags=["memory"])
 
     @app.get("/healthz", tags=["health"])
     async def health_check() -> dict[str, str]:
-        """Liveness probe used by Docker Compose and Railway."""
         return {"status": "ok"}
 
     @app.post(
@@ -150,19 +140,6 @@ def create_app() -> FastAPI:
         summary="Launch an agent orchestration run",
     )
     async def orchestrate(body: OrchestrateRequest) -> OrchestrateResponse:
-        """
-        Accept a run request and launch the LangGraph graph as a background task.
-
-        Returns {run_id, status: "running"} immediately. The graph executes
-        in the background via asyncio.ensure_future and updates the runs row
-        in Postgres when complete (implemented in AGNT-010).
-
-        Args:
-            body: OrchestrateRequest with run_id, query, user_id.
-
-        Returns:
-            OrchestrateResponse confirming the run has been dispatched.
-        """
         initial_state: OrchestratorState = {
             "run_id": body.run_id,
             "user_id": body.user_id,
@@ -179,14 +156,8 @@ def create_app() -> FastAPI:
             "output_tokens": 0,
             "metadata": {},
         }
-
         asyncio.ensure_future(_run_graph(app.state.graph, initial_state, body.run_id))
-
-        logger.info(
-            "orchestrator.run_dispatched",
-            run_id=body.run_id,
-            user_id=body.user_id,
-        )
+        logger.info("orchestrator.run_dispatched", run_id=body.run_id, user_id=body.user_id)
         return OrchestrateResponse(run_id=body.run_id, status="running")
 
     return app
@@ -197,28 +168,13 @@ async def _run_graph(
     state: OrchestratorState,
     run_id: str,
 ) -> None:
-    """
-    Execute the compiled LangGraph graph for a single run.
-
-    Wraps graph.ainvoke in try/except so background failures are logged
-    rather than silently swallowed by the asyncio event loop.
-
-    Args:
-        graph: Compiled CompiledStateGraph from build_graph().
-        state: Initial OrchestratorState for this run.
-        run_id: Run UUID string for structured log correlation.
-    """
     active_runs.labels(service="orchestrator").inc()
     try:
         await graph.ainvoke(state)  # type: ignore[attr-defined]
         logger.info("orchestrator.run_complete", run_id=run_id)
         orchestrator_runs_total.labels(status="completed").inc()
     except Exception as exc:
-        logger.error(
-            "orchestrator.run_failed",
-            run_id=run_id,
-            error=str(exc),
-        )
+        logger.error("orchestrator.run_failed", run_id=run_id, error=str(exc))
         orchestrator_runs_total.labels(status="failed").inc()
     finally:
         active_runs.labels(service="orchestrator").dec()

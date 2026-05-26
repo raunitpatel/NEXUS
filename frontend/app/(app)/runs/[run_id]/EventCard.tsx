@@ -63,11 +63,14 @@ const DEFAULT_BADGE: BadgeConfig = {
 
 function formatTime(isoString: string): string {
   try {
-    return new Date(isoString).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
+    return new Date(isoString)
+      .toLocaleTimeString('en-US', {
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+      .toLowerCase()
   } catch {
     return isoString
   }

@@ -5,6 +5,7 @@ All environment variables for the orchestrator service are declared here.
 No other file in this service may call os.getenv directly.
 """
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +21,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Application
@@ -28,7 +30,28 @@ class Settings(BaseSettings):
     service_name: str = "orchestrator"
 
     # Database
-    database_url: str = "postgresql+asyncpg://nexus:nexus_secret@postgres:5432/nexus_db"
+    database_url: str = (
+        "postgresql+asyncpg://nexus:nexus_secret@postgres:5432/nexus_db"
+    )
+
+    @model_validator(mode="after")
+    def normalize_database_url(self):
+        if self.database_url.startswith("postgres://"):
+            self.database_url = self.database_url.replace(
+                "postgres://",
+                "postgresql+asyncpg://",
+                1,
+            )
+
+        elif self.database_url.startswith("postgresql://") and "+asyncpg" not in self.database_url:
+            self.database_url = self.database_url.replace(
+                "postgresql://",
+                "postgresql+asyncpg://",
+                1,
+            )
+
+        return self
+
     db_pool_size: int = 5
     db_pool_max_overflow: int = 10
 
@@ -45,7 +68,7 @@ class Settings(BaseSettings):
     # LLM Provider selection
     llm_provider: str = "ollama"
 
-    # Ollama settings (used when llm_provider == "ollama")
+    # Ollama settings
     ollama_base_url: str = "http://host.docker.internal:11434"
     ollama_model: str = "qwen3:7b"
     ollama_timeout_seconds: int = 120
@@ -60,20 +83,37 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash"
     gemini_timeout_seconds: int = 120
 
-    # Internal agent URLs
-    search_agent_url: str = "http://search-agent:8002"
-    code_agent_url: str = "http://code-agent:8003"
-    memory_agent_url: str = "http://memory-agent:8004"
-    tool_agent_url: str = "http://tool-agent:8005"
+    # Search
+    search_provider: str = "mock"
+    tavily_api_key: str = "your_tavily_api_key"
+    search_max_results: int = 5
+
+    # Cache
+    llm_cache_ttl_seconds: int = 3600
+    vector_cache_ttl_seconds: int = 300
 
     # LangGraph execution
     max_plan_retries: int = 3
-    task_timeout_seconds: int = 30
     max_parallel_tasks: int = 4
+    max_iterations: int = 3
+    task_timeout_seconds: int = 30
+    execution_timeout_seconds: int = 10
+
+    # Vector / Embeddings
+    embedding_model_name: str = "all-MiniLM-L6-v2"
+    embedding_dimensions: int = 384
+    vector_similarity_threshold: float = 0.75
+    vector_top_k: int = 10
 
     # Circuit breaker
     circuit_breaker_failure_threshold: int = 5
     circuit_breaker_recovery_timeout_seconds: int = 60
+
+    # External APIs
+    weather_api_base_url: str = "https://api.open-meteo.com/v1"
+    wikipedia_api_base_url: str = (
+        "https://en.wikipedia.org/api/rest_v1"
+    )
 
     # Observability
     otel_exporter_otlp_endpoint: str = "http://jaeger:4317"

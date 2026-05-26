@@ -3,7 +3,7 @@
 All environment variables for the gateway service are declared here.
 No other file in this service may call os.getenv directly.
 """
-
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +28,26 @@ class Settings(BaseSettings):
     # Database
 
     database_url: str = "postgresql+asyncpg://postgres@db:5432/postgres"
+    
+    @model_validator(mode="after")
+    def normalize_database_url(self):
+        if self.database_url.startswith("postgres://"):
+            self.database_url = self.database_url.replace(
+                "postgres://",
+                "postgresql+asyncpg://",
+                1,
+            )
+
+        elif self.database_url.startswith("postgresql://") and "+asyncpg" not in self.database_url:
+            self.database_url = self.database_url.replace(
+                "postgresql://",
+                "postgresql+asyncpg://",
+                1,
+            )
+
+        return self
+
+        return self
     db_pool_size: int = 10
     db_pool_max_overflow: int = 20
 

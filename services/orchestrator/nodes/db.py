@@ -1,21 +1,16 @@
 """
-Shared DB engine accessor for orchestrator nodes.
-
-Provide a single `set_db_engine()` and `get_db_engine()` so all nodes
-share the same engine instance and avoid duplicate-module singleton bugs.
+Shared DB engine accessor — delegates to nodes.app_state for consistency.
 """
 
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncEngine
-
-_db_engine: AsyncEngine | None = None
+from nodes.app_state import set_db_engine as _set, get_db_engine as _get
 
 
 def set_db_engine(engine: AsyncEngine) -> None:
-    global _db_engine
-    _db_engine = engine
+    _set(engine)
 
 
 def get_db_engine() -> AsyncEngine | None:
-    return _db_engine
+    return _get()
