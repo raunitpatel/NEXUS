@@ -53,4 +53,4 @@ logs/
 *.cert
 
 # Test artifacts
-.testcontainers.properties
+.testcontainers.properties*.mp4

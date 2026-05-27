@@ -47,7 +47,6 @@ class Settings(BaseSettings):
 
         return self
 
-        return self
     db_pool_size: int = 10
     db_pool_max_overflow: int = 20
 

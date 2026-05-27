@@ -6,12 +6,12 @@ import httpx
 import structlog
 from dependencies import get_current_user
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from config import settings
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
-_ORCHESTRATOR_URL = "http://nexus-orchestrator:8001"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -44,7 +44,7 @@ async def search_memory(
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{_ORCHESTRATOR_URL}/memory/search",
+                f"{settings.orchestrator_url}/memory/search",
                 params={
                     "q": q,
                     "limit": limit,
@@ -121,7 +121,7 @@ async def list_memory(
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(
-                f"{_ORCHESTRATOR_URL}/memory",
+                f"{settings.orchestrator_url}/memory",
                 params={
                     "limit": limit,
                     "offset": offset,
