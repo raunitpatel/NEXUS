@@ -1,6 +1,8 @@
+<div align="center">
+
 # NEXUS
 
-**Distributed AI Agent Orchestration Platform**
+## Distributed AI Agent Orchestration Platform
 
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -10,6 +12,8 @@
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis&logoColor=white)](https://redis.io)
 [![Kafka](https://img.shields.io/badge/Kafka-Confluent-231F20?logo=apache-kafka)](https://kafka.apache.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose_v2-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+
+</div>
 
 NEXUS lets users submit a natural-language query and watch in real time as specialized AI agents — Search, Code, Memory, and Tool — collaborate to answer it. A LangGraph-powered Orchestrator decomposes the query, dispatches tasks, and synthesizes a final answer while streaming every thought to the browser via SSE.
 
