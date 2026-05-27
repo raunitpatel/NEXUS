@@ -17,13 +17,7 @@ NEXUS lets users submit a natural-language query and watch in real time as speci
 
 ## Live Demo
 
-<iframe 
-    width="800" 
-    height="450"
-    src="https://www.youtube.com/embed/BrcfatovUzE"
-    frameborder="0"
-    allowfullscreen>
-</iframe>
+[![NEXUS Demo](https://img.youtube.com/vi/BrcfatovUzE/maxresdefault.jpg)](https://youtu.be/BrcfatovUzE)
 
 ---
 
