@@ -92,8 +92,8 @@ export default async function RunDetailPage({ params }: RunDetailPageProps) {
   const run = await fetchRun(run_id, token)
   if (!run) notFound()
 
-  // For completed/failed runs, pre-load events
-  const initialEvents = (run.status === 'completed' || run.status === 'failed')
+  // For completed, failed, or cancelled runs, pre-load events
+  const initialEvents = (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled')
     ? await fetchEvents(run_id, token)
     : []
 

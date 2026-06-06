@@ -1,5 +1,5 @@
 """
-finalize_run node — writes terminal state to Postgres and emits run_complete event.
+finalize_run node — writes terminal state to Postgres and emits run_complete/run_error/run_cancelled events.
 
 Executes:
   - UPDATE runs SET status, output, error, completed_at, metadata WHERE id
@@ -142,7 +142,7 @@ def _build_metadata(state: OrchestratorState, terminal_status: str) -> dict[str,
 
 async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
     """
-    Update runs table to terminal status and emit SSE run_complete/run_error event.
+    Update runs table to terminal status and emit SSE run_complete/run_error/run_cancelled event.
 
     Reads final_output and error from state. Builds a comprehensive metadata
     dict including task summaries, agent types used, and token counts. Merges
@@ -159,7 +159,16 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
     final_output: str | None = state.get("final_output")
     error: str | None = state.get("error")
 
-    terminal_status = "failed" if error else "completed"
+    terminal_status = (
+        "cancelled"
+        if state.get("cancelled") or state.get("status") == "cancelled"
+        else "failed"
+        if error
+        else "completed"
+    )
+
+    if terminal_status == "cancelled" and not error:
+        error = "Cancelled by user"
 
     metadata = _build_metadata(state, terminal_status)
 
@@ -195,6 +204,17 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
                 autoflush=False,
             )
             async with session_factory() as session:
+                current_status_result = await session.execute(
+                    text("SELECT status FROM runs WHERE id = :run_id"),
+                    {"run_id": run_id},
+                )
+                current_status_row = current_status_result.fetchone()
+                if current_status_row and current_status_row.status == "cancelled":
+                    terminal_status = "cancelled"
+                    if not error:
+                        error = "Cancelled by user"
+                    metadata = _build_metadata(state, terminal_status)
+
                 await session.execute(
                     text(
                         """
@@ -216,6 +236,13 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
                         "meta": json.dumps(metadata),
                     },
                 )
+                if terminal_status in ("failed", "cancelled"):
+                    await _mark_unfinished_tasks_failed(
+                        session=session,
+                        run_id=run_id,
+                        terminal_status=terminal_status,
+                        error=error,
+                    )
                 await session.commit()
 
             # --- Post-write verification ---
@@ -289,7 +316,13 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
                 warning="SSE terminal event will NOT be delivered — _redis_client is None",
             )
         else:
-            event_type_sse = "run_complete" if terminal_status == "completed" else "run_error"
+            event_type_sse = (
+                "run_complete"
+                if terminal_status == "completed"
+                else "run_error"
+                if terminal_status == "failed"
+                else "run_cancelled"
+            )
             await emit_event(
                 run_id=run_id,
                 event_type=event_type_sse,
@@ -315,6 +348,41 @@ async def finalize_run(state: OrchestratorState) -> dict[str, Any]:
     return {"status": terminal_status}
 
 
+async def _mark_unfinished_tasks_failed(
+    session: Any,
+    run_id: str,
+    terminal_status: str,
+    error: str | None,
+) -> None:
+    """
+    Mark planned tasks that never reached record_result as failed.
+
+    The orchestrator inserts the full task plan before dispatch. If the run
+    fails or is cancelled before later tasks execute, those rows otherwise stay
+    pending forever and metrics undercount failures.
+    """
+    reason = error or (
+        "Run was cancelled before this task completed"
+        if terminal_status == "cancelled"
+        else "Run failed before this task completed"
+    )
+
+    await session.execute(
+        text(
+            """
+            UPDATE tasks
+            SET
+                status       = 'failed',
+                error        = COALESCE(NULLIF(error, ''), :error),
+                completed_at = COALESCE(completed_at, NOW())
+            WHERE run_id = :run_id
+              AND status IN ('pending', 'running', 'retrying')
+            """
+        ),
+        {"run_id": run_id, "error": reason},
+    )
+
+
 async def _publish_run_event(
     run_id: str,
     terminal_status: str,
@@ -336,7 +404,13 @@ async def _publish_run_event(
     from config import settings
     from shared.kafka_client import KafkaProducerFactory
 
-    event_type = "run_complete" if terminal_status == "completed" else "run_error"
+    event_type = (
+        "run_complete"
+        if terminal_status == "completed"
+        else "run_error"
+        if terminal_status == "failed"
+        else "run_cancelled"
+    )
 
     try:
         producer = await KafkaProducerFactory.get_producer(

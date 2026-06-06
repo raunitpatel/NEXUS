@@ -66,7 +66,15 @@ export interface CreateRunResponse {
 
 // ── Agents ────────────────────────────────────────────────────────────────────
 
-export type AgentType = 'search' | 'code' | 'memory' | 'tool' | 'orchestrator'
+export type AgentType =
+  | 'search'
+  | 'code'
+  | 'memory'
+  | 'memory_read'
+  | 'memory_write'
+  | 'tool'
+  | 'orchestrator'
+  | 'synthesize'
 
 export interface Agent {
   agent_id: string
@@ -92,10 +100,11 @@ export type EventType =
   | 'run_start'
   | 'run_complete'
   | 'run_error'
+  | 'run_cancelled'
   | 'memory_read'
   | 'memory_write'
   | 'llm_response'
-  | 'code_iteration'
+  | 'error'
 
 export interface RunEvent {
   event_id: string
@@ -114,13 +123,18 @@ export interface RunDetail extends Run {
   completed_at: string | null
 }
 
+export interface CancelRunResponse {
+  run_id: string
+  status: RunStatus
+}
+
 // ── Memory ────────────────────────────────────────────────────────────────────
 
 export interface MemorySearchResult {
   embedding_id: string
   run_id: string
   content: string
-  similarity: number
+  similarity?: number
   model: string
   created_at: string
 }
@@ -167,6 +181,13 @@ export interface DailyLatency {
   avg_duration_ms: number
   p95_duration_ms: number
   run_count: number
+}
+
+export interface DailyErrorRate {
+  date: string
+  total_runs: number
+  failed_runs: number
+  error_rate: number
 }
 
 // ── API errors ────────────────────────────────────────────────────────────────

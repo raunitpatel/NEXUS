@@ -648,6 +648,7 @@ async def test_record_result_appends_to_completed_tasks() -> None:
     assert result["completed_tasks"][0]["task_id"] == "t1"
     assert result["pending_task"] is None
     assert result["task_result"] is None
+    assert result["error"] is None
 
 
 @pytest.mark.asyncio

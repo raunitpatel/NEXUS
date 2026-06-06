@@ -34,7 +34,16 @@ const AGENT_CHIP_STYLES: Record<string, { bg: string; text: string; dot: string 
 export function RunSummary({ run, events, connectionStatus }: RunSummaryProps) {
   // Derive agent usage from events
   const agentUsage: AgentUsage = {}
+  const completionEvents = new Set(['tool_result', 'memory_read', 'memory_write'])
+  const terminalEvents = new Set(['run_complete', 'run_error', 'run_cancelled'])
+
+  let terminalEventType: string | undefined
+
   for (const ev of events) {
+    if (!terminalEventType && terminalEvents.has(ev.event_type)) {
+      terminalEventType = ev.event_type
+    }
+
     if (ev.event_type === 'orchestrator_dispatch') {
       const agentType = (ev.payload as Record<string, unknown>)?.agent_type as string | undefined
       if (agentType) {
@@ -42,7 +51,8 @@ export function RunSummary({ run, events, connectionStatus }: RunSummaryProps) {
         agentUsage[agentType].dispatched++
       }
     }
-    if (ev.event_type === 'tool_result') {
+
+    if (completionEvents.has(ev.event_type)) {
       const agentType = (ev.payload as Record<string, unknown>)?.agent_type as string | undefined
       if (agentType) {
         agentUsage[agentType] = agentUsage[agentType] ?? { dispatched: 0, done: 0 }
@@ -83,6 +93,10 @@ export function RunSummary({ run, events, connectionStatus }: RunSummaryProps) {
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
                     Done
                   </span>
+                ) : terminalEventType === 'run_error' ? (
+                  <span className="text-[12px] text-nexus-error font-medium">Failed</span>
+                ) : terminalEventType === 'run_cancelled' ? (
+                  <span className="text-[12px] text-nexus-muted font-medium">Cancelled</span>
                 ) : (
                   <span className="text-[12px] text-nexus-muted font-medium">In progress…</span>
                 )}

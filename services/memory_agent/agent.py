@@ -116,20 +116,36 @@ class MemoryAgent:
         self._redis = redis_client
         self._model = EmbeddingModel()
 
-    def _make_cache_key(self, user_id: str, query_text: str) -> str:
+    def _make_cache_key(
+        self,
+        user_id: str,
+        query_text: str,
+        limit: int,
+        similarity_threshold: float,
+    ) -> str:
         """
-        Build a deterministic Redis cache key for a user + query pair.
+        Build a deterministic Redis cache key for a user + query + search options.
 
-        Format: vsearch:{user_id}:{sha256(query_text)}
+        Format: vsearch:{user_id}:{sha256(query_text + json(options))}
 
         Args:
             user_id: The authenticated user's UUID.
             query_text: The raw query string.
+            limit: Maximum number of results.
+            similarity_threshold: Minimum similarity score.
 
         Returns:
             Redis key string.
         """
-        digest = hashlib.sha256(query_text.encode("utf-8")).hexdigest()
+        payload = json.dumps(
+            {
+                "query_text": query_text,
+                "limit": limit,
+                "similarity_threshold": similarity_threshold,
+            },
+            sort_keys=True,
+        )
+        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
         return f"{_CACHE_KEY_PREFIX}{user_id}:{digest}"
 
     async def embed(
@@ -187,10 +203,10 @@ class MemoryAgent:
             duration_ms=duration_ms,
         )
 
-        agent_task_duration_seconds.labels(agent="memory-embed", status="success").observe(
+        agent_task_duration_seconds.labels(agent="memory_write", status="success").observe(
             duration_ms / 1000
         )
-        agent_tasks_total.labels(agent="memory-embed", status="success").inc()
+        agent_tasks_total.labels(agent="memory_write", status="success").inc()
 
         return EmbedResult(
             embedding_id=embedding_id,
@@ -223,7 +239,12 @@ class MemoryAgent:
         start_ms = time.monotonic()
         effective_limit = limit or settings.vector_top_k
         effective_threshold = similarity_threshold or settings.vector_similarity_threshold
-        cache_key = self._make_cache_key(user_id, query_text)
+        cache_key = self._make_cache_key(
+            user_id,
+            query_text,
+            effective_limit,
+            effective_threshold,
+        )
 
         # Cache read
         try:
@@ -277,10 +298,10 @@ class MemoryAgent:
             duration_ms=duration_ms,
         )
 
-        agent_task_duration_seconds.labels(agent="memory-search", status="success").observe(
+        agent_task_duration_seconds.labels(agent="memory_read", status="success").observe(
             duration_ms / 1000
         )
-        agent_tasks_total.labels(agent="memory-search", status="success").inc()
+        agent_tasks_total.labels(agent="memory_read", status="success").inc()
 
         return SearchResult(results=results, from_cache=False, duration_ms=duration_ms)
 

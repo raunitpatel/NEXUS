@@ -95,6 +95,12 @@ def test_route_validate_with_error_set_routes_to_handle_error() -> None:
     assert _route_after_validate(state) == "handle_error"  # type: ignore[arg-type]
 
 
+def test_route_validate_cancelled_run_routes_to_finalize() -> None:
+    """Cancelled state routes immediately to finalize_run."""
+    state = {**_base_state(), "task_plan": [_make_task_plan()], "cancelled": True}
+    assert _route_after_validate(state) == "finalize_run"  # type: ignore[arg-type]
+
+
 def test_route_validate_valid_plan_routes_to_dispatch() -> None:
     """Populated task_plan with no error routes to dispatch_next_task."""
     state = {**_base_state(), "task_plan": [_make_task_plan()]}
@@ -104,10 +110,10 @@ def test_route_validate_valid_plan_routes_to_dispatch() -> None:
 # ── _route_after_await ───────────────────────────────────────────────────────
 
 
-def test_route_await_task_error_routes_to_handle_error() -> None:
-    """task_result with error routes to handle_error."""
+def test_route_await_task_error_routes_to_record_result() -> None:
+    """task_result with error routes to record_result so failure is persisted."""
     state = {**_base_state(), "task_result": _make_task_result(error="timeout")}
-    assert _route_after_await(state) == "handle_error"  # type: ignore[arg-type]
+    assert _route_after_await(state) == "record_result"  # type: ignore[arg-type]
 
 
 def test_route_await_task_ok_routes_to_record_result() -> None:
@@ -144,6 +150,17 @@ def test_route_record_all_done_routes_to_synthesize() -> None:
     assert _route_after_record(state) == "synthesize_output"  # type: ignore[arg-type]
 
 
+def test_route_record_cancelled_run_routes_to_finalize() -> None:
+    """Cancelled state routes immediately to finalize_run after recording results."""
+    state = {
+        **_base_state(),
+        "task_plan": [_make_task_plan("t1")],
+        "completed_tasks": [_make_task_result("t1")],
+        "cancelled": True,
+    }
+    assert _route_after_record(state) == "finalize_run"  # type: ignore[arg-type]
+
+
 # ── _route_after_error ───────────────────────────────────────────────────────
 
 
@@ -156,6 +173,12 @@ def test_route_error_within_retries_routes_to_dispatch() -> None:
 def test_route_error_at_max_retries_routes_to_finalize() -> None:
     """retry_count=3 with max_plan_retries=3 routes to finalize_run."""
     state = {**_base_state(), "retry_count": 3}
+    assert _route_after_error(state) == "finalize_run"
+
+
+def test_route_error_cancelled_run_routes_to_finalize() -> None:
+    """Cancelled state takes precedence and routes to finalize_run."""
+    state = {**_base_state(), "retry_count": 1, "cancelled": True}
     assert _route_after_error(state) == "finalize_run"
 
 

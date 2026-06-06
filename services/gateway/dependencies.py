@@ -8,11 +8,9 @@ as FastAPI Depends() parameters — never access request.app.state directly.
 from collections.abc import AsyncIterator
 
 import redis.asyncio as aioredis
-import structlog
 from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-logger = structlog.get_logger(__name__)
 
 
 async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:

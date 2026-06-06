@@ -83,7 +83,7 @@ class EmbeddingEntry(BaseModel):
     Attributes:
         embedding_id: UUID of the embeddings_metadata row.
         run_id: UUID of the parent run.
-        content: The embedded text (truncated to 300 chars).
+        content: The embedded text.
         model: Embedding model name.
         created_at: ISO 8601 UTC timestamp string.
     """
@@ -274,7 +274,7 @@ async def list_memory(
         EmbeddingEntry(
             embedding_id=row.embedding_id,
             run_id=row.run_id,
-            content=row.content[:300],
+            content=row.content,
             model=row.model,
             created_at=row.created_at,
         )

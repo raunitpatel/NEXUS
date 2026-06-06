@@ -1,14 +1,7 @@
 'use client'
 
 /**
- * ErrorRateChart — LineChart showing derived error rate % per day.
- *
- * Since the latency endpoint doesn't include failures, we derive error
- * rate from the MetricsSummary (all-time) and display a single flat line.
- * When daily breakdown is available (via AgentStats), we compute it per day.
- *
- * For now: uses DailyTokenUsage run_count vs a synthetic failed estimate
- * based on the user's overall success_rate from MetricsSummary.
+ * ErrorRateChart — LineChart showing run error rate % per day.
  */
 
 import {
@@ -21,18 +14,18 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts'
-import type { DailyTokenUsage, MetricsSummary } from '@/lib/types'
+import type { DailyErrorRate } from '@/lib/types'
 
 interface ErrorRateChartProps {
-  tokenData: DailyTokenUsage[]
-  summary: MetricsSummary | null
+  data: DailyErrorRate[]
   isLoading: boolean
 }
 
 interface DerivedErrorPoint {
   date: string
   error_rate: number
-  run_count: number
+  total_runs: number
+  failed_runs: number
 }
 
 interface TooltipPayloadEntry {
@@ -75,19 +68,16 @@ function NoDataPlaceholder() {
   )
 }
 
-/** Line chart showing estimated error rate % per day based on overall success_rate. */
-export function ErrorRateChart({ tokenData, summary, isLoading }: ErrorRateChartProps) {
+/** Line chart showing real daily run error rate %. */
+export function ErrorRateChart({ data, isLoading }: ErrorRateChartProps) {
   if (isLoading) return <SkeletonChart />
-  if (tokenData.length === 0 || !summary) return <NoDataPlaceholder />
+  if (data.length === 0) return <NoDataPlaceholder />
 
-  // Derive error rate per day using the overall error rate as a constant approximation.
-  // When per-day failure data is available from a future endpoint, replace this.
-  const overallErrorRate = (1 - summary.success_rate) * 100
-
-  const chartData: DerivedErrorPoint[] = tokenData.map((day) => ({
+  const chartData: DerivedErrorPoint[] = data.map((day) => ({
     date: day.date,
-    run_count: day.run_count,
-    error_rate: day.run_count > 0 ? parseFloat(overallErrorRate.toFixed(1)) : 0,
+    total_runs: day.total_runs,
+    failed_runs: day.failed_runs,
+    error_rate: parseFloat((day.error_rate * 100).toFixed(1)),
   }))
 
   return (

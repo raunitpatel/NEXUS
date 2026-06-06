@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
 from sse_emitter import emit_event
 from state import OrchestratorState
 
+import nodes.cancel as cancel
 from nodes import get_redis_client
 from nodes.db import get_db_engine
 
@@ -141,9 +142,14 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
                 warning="SSE terminal event will NOT be delivered — _redis_client is None",
             )
         else:
+            event_type = (
+                task_result.get("agent_type")
+                if task_result.get("agent_type") in ("memory_read", "memory_write")
+                else "tool_result"
+            )
             await emit_event(
                 run_id=run_id,
-                event_type="tool_result",
+                event_type=event_type,
                 agent_name="orchestrator.record_result",
                 payload={
                     "task_id": task_id,
@@ -168,8 +174,18 @@ async def record_result(state: OrchestratorState) -> dict[str, Any]:
         total_count=len(state.get("task_plan", [])),
     )
 
+    cancel_state = await cancel.maybe_cancel_run(run_id)
+    if cancel_state:
+        return {
+            **cancel_state,
+            "completed_tasks": completed_tasks,
+            "pending_task": None,
+            "task_result": None,
+        }
+
     return {
         "completed_tasks": completed_tasks,
         "pending_task": None,
         "task_result": None,
+        "error": None,
     }

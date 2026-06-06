@@ -116,6 +116,66 @@ async def test_full_graph_run_with_mocked_agents() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cancelled_run_stops_before_synthesis() -> None:
+    """
+    When a cancelled run is detected after recording the first task, the graph
+    should finalize immediately without calling synthesis.
+    """
+    decompose_json = json.dumps(
+        {
+            "tasks": [
+                {"agent_type": "search", "description": "Find capital of France", "depends_on": []}
+            ]
+        }
+    )
+
+    mock_provider = AsyncMock()
+    mock_provider.complete = AsyncMock(
+        side_effect=[LLMResponse(content=decompose_json, prompt_tokens=100, completion_tokens=50)]
+    )
+
+    mock_http_response = MagicMock()
+    mock_http_response.json.return_value = {"output": {"answer": "Paris"}, "error": None}
+    mock_http_response.raise_for_status = MagicMock()
+
+    mock_http_client = AsyncMock()
+    mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+    mock_http_client.__aexit__ = AsyncMock(return_value=False)
+    mock_http_client.post = AsyncMock(return_value=mock_http_response)
+
+    mock_session = AsyncMock()
+    mock_session.execute = AsyncMock()
+    mock_session.commit = AsyncMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    with (
+        patch("nodes.decompose_query.get_llm_provider", return_value=mock_provider),
+        patch("nodes.decompose_query._publish_thought_event", new_callable=AsyncMock),
+        patch("nodes.finalize_run._publish_run_event", new_callable=AsyncMock),
+        patch("nodes.dispatch_next_task.httpx.AsyncClient", return_value=mock_http_client),
+        patch("nodes.dispatch_next_task.task_exists", new_callable=AsyncMock, return_value=True),
+        patch("nodes.decompose_query.insert_task_plan", new_callable=AsyncMock),
+        patch("nodes.record_result.get_db_engine", return_value=None),
+        patch("nodes.finalize_run.get_db_engine", return_value=None),
+        patch(
+            "nodes.cancel.maybe_cancel_run",
+            new_callable=AsyncMock,
+            side_effect=[{}, {"cancelled": True, "status": "cancelled", "error": "Cancelled by user"}],
+        ),
+    ):
+        from graph import build_graph
+
+        graph = build_graph()
+        final_state = await graph.ainvoke(_make_initial_state())
+
+    assert final_state["status"] == "cancelled"
+    assert final_state["final_output"] is None
+    assert len(final_state["completed_tasks"]) == 1
+    assert final_state["completed_tasks"][0]["task_id"] is not None
+
+
+@pytest.mark.asyncio
 async def test_graph_run_agent_timeout_exhausts_retries() -> None:
     """
     Graph run where agent HTTP always times out exhausts retries and finalizes as failed.

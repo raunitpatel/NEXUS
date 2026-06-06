@@ -12,6 +12,8 @@ All endpoints require a valid JWT (enforced by AuthMiddleware).
 from __future__ import annotations
 
 from typing import Annotated, Any
+import json
+from datetime import datetime, timezone
 
 import httpx
 import structlog
@@ -104,15 +106,29 @@ class CreateRunResponse(BaseModel):
     Response returned immediately after POST /api/v1/runs.
 
     The run is created synchronously but the orchestration executes
-    asynchronously — status is always "running" on creation.
+    asynchronously — status is "pending" until the Orchestrator has
+    accepted the dispatch.
 
     Attributes:
         run_id: UUID of the newly created run.
-        status: Always "running" for a freshly created run.
+        status: Current status of the run after dispatch attempt.
     """
 
     run_id: str
-    status: str = "running"
+    status: str = "pending"
+
+
+class CancelRunResponse(BaseModel):
+    """
+    Response returned after POST /api/v1/runs/{run_id}/cancel.
+
+    Attributes:
+        run_id: UUID of the cancelled run.
+        status: Always "cancelled" after successful cancellation.
+    """
+
+    run_id: str
+    status: str = "cancelled"
 
 
 # ── POST /api/v1/runs ─────────────────────────────────────────────────────────
@@ -150,13 +166,12 @@ async def create_run(
     """
     user_id = current_user["user_id"]
 
-    # Insert run row — status starts as "running" (orchestrator will update to
-    # "completed" or "failed" via finalize_run node)
+    # Insert run row — status starts as "pending" until Orchestrator accepts it.
     result = await db.execute(
         text(
             """
-            INSERT INTO runs (user_id, query, status)
-            VALUES (:user_id, :query, 'running')
+            INSERT INTO runs (user_id, query)
+            VALUES (:user_id, :query)
             RETURNING id::text, created_at
             """
         ),
@@ -169,21 +184,45 @@ async def create_run(
 
     logger.info("runs.create", run_id=run_id, user_id=user_id, query=body.query[:80])
 
-    # Dispatch to Orchestrator — fire-and-forget, do not await completion
-    await _dispatch_to_orchestrator(
+    dispatch_status = await _dispatch_to_orchestrator(
+        db=db,
         run_id=run_id,
         query=body.query,
         user_id=user_id,
     )
 
-    return CreateRunResponse(run_id=run_id, status="running")
+    return CreateRunResponse(run_id=run_id, status=dispatch_status or "pending")
+
+
+async def _mark_run_failed(db: AsyncSession, run_id: str, error: str) -> None:
+    await db.execute(
+        text(
+            """
+            UPDATE runs
+            SET status = 'failed', error = :error, completed_at = NOW(), metadata = metadata || CAST(:meta AS jsonb)
+            WHERE id = :run_id
+            """
+        ),
+        {
+            "run_id": run_id,
+            "error": error,
+            "meta": json.dumps(
+                {
+                    "last_dispatch_error": error,
+                    "dispatch_failed_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
+        },
+    )
+    await db.commit()
 
 
 async def _dispatch_to_orchestrator(
+    db: AsyncSession,
     run_id: str,
     query: str,
     user_id: str,
-) -> None:
+) -> str | None:
     """
     Fire POST /orchestrate to the Orchestrator service.
 
@@ -192,11 +231,12 @@ async def _dispatch_to_orchestrator(
     intentionally short — we only need the Orchestrator to acknowledge the
     dispatch, not wait for it to complete.
 
-    Failures are logged as ERROR but do not raise — the run row already
-    exists in Postgres and the client can poll GET /api/v1/runs/{run_id}
-    for status updates.
+    On success the run row remains pending until the Orchestrator updates
+    it to running. On failure the row is marked failed so clients can observe
+    the correct terminal state.
 
     Args:
+        db: Active database session.
         run_id: UUID of the newly created run.
         query: The user's query string.
         user_id: UUID of the authenticated user.
@@ -213,26 +253,44 @@ async def _dispatch_to_orchestrator(
                     "user_id": user_id,
                 },
             )
-            if response.status_code != 200:
-                logger.error(
-                    "runs.dispatch_failed",
+
+            if response.status_code == 200:
+                logger.info("runs.dispatched", run_id=run_id)
+                return "pending"
+
+            if response.status_code == 409:
+                logger.info(
+                    "runs.dispatch_conflict",
                     run_id=run_id,
                     status=response.status_code,
                     body=response.text[:200],
                 )
-            else:
-                logger.info("runs.dispatched", run_id=run_id)
+                return "cancelled"
+
+            error = f"Orchestrator responded {response.status_code}: {response.text[:200]}"
+            logger.error("runs.dispatch_failed", run_id=run_id, status=response.status_code, body=response.text[:200])
+            await _mark_run_failed(db, run_id, error)
+            return "failed"
 
     except httpx.ConnectError:
+        error = "Orchestrator unreachable"
         logger.error(
             "runs.orchestrator_unreachable",
             run_id=run_id,
             orchestrator_url=settings.orchestrator_url,
         )
+        await _mark_run_failed(db, run_id, error)
+        return "failed"
     except httpx.TimeoutException:
+        error = "Orchestrator dispatch timed out"
         logger.error("runs.orchestrator_timeout", run_id=run_id)
+        await _mark_run_failed(db, run_id, error)
+        return "failed"
     except Exception as exc:
+        error = f"Dispatch failure: {exc}"
         logger.error("runs.dispatch_error", run_id=run_id, error=str(exc))
+        await _mark_run_failed(db, run_id=run_id, error=error)
+        return "failed"
 
 
 # ── GET /api/v1/runs ──────────────────────────────────────────────────────────
@@ -559,3 +617,77 @@ async def get_run(
         total_tokens=row.total_tokens or 0,
         latency_ms=row.latency_ms,
     )
+
+
+@router.post(
+    "/{run_id}/cancel",
+    response_model=CancelRunResponse,
+    summary="Cancel a pending or running run",
+)
+async def cancel_run(
+    run_id: str,
+    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+) -> CancelRunResponse:
+    user_id = current_user["user_id"]
+
+    result = await db.execute(
+        text(
+            """
+            UPDATE runs
+            SET
+                status = 'cancelled',
+                completed_at = NOW(),
+                metadata = metadata || CAST(:meta AS jsonb)
+            WHERE id = :run_id
+              AND user_id = :user_id
+              AND status IN ('pending', 'running')
+            RETURNING id::text
+            """
+        ),
+        {
+            "run_id": run_id,
+            "user_id": user_id,
+            "meta": json.dumps(
+                {
+                    "cancelled_at": datetime.now(timezone.utc).isoformat(),
+                }
+            ),
+        },
+    )
+    row = result.fetchone()
+    if row is None:
+        owner_check = await db.execute(
+            text(
+                "SELECT 1 FROM runs WHERE id = :run_id AND user_id = :user_id"
+            ),
+            {"run_id": run_id, "user_id": user_id},
+        )
+        if owner_check.fetchone() is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Run {run_id} not found",
+            )
+
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Run {run_id} cannot be cancelled",
+        )
+
+    await db.execute(
+        text(
+            """
+            UPDATE tasks
+            SET
+                status       = 'failed',
+                error        = COALESCE(NULLIF(error, ''), 'Run was cancelled before this task completed'),
+                completed_at = COALESCE(completed_at, NOW())
+            WHERE run_id = :run_id
+              AND status IN ('pending', 'running', 'retrying')
+            """
+        ),
+        {"run_id": run_id},
+    )
+    await db.commit()
+    logger.info("runs.cancelled", run_id=run_id, user_id=user_id)
+    return CancelRunResponse(run_id=run_id)

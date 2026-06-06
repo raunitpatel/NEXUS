@@ -14,8 +14,7 @@ Edge map:
     validate_plan ──► (valid plan)           ──► dispatch_next_task
     dispatch_next_task ──► (error)           ──► handle_error
     dispatch_next_task ──► (success)         ──► await_task_result
-    await_task_result ──► (task error)       ──► handle_error
-    await_task_result ──► (task ok)          ──► record_result
+    await_task_result ──► record_result
     record_result ──► (more tasks remain)    ──► dispatch_next_task
     record_result ──► (all tasks done)       ──► synthesize_output
     synthesize_output ──► finalize_run ──► END
@@ -32,8 +31,6 @@ Diagram:
     └── valid ─────────► dispatch_next_task
                                 ↓
                         await_task_result
-                            ├── error ─► handle_error
-                            └── success
                                 ↓
                             record_result
                             ├── more tasks ─► dispatch_next_task
@@ -71,6 +68,8 @@ def _route_after_validate(state: OrchestratorState) -> str:
     Returns:
         'dispatch_next_task' or 'handle_error'.
     """
+    if state.get("cancelled"):
+        return "finalize_run"
     if state.get("error") or not state.get("task_plan"):
         return "handle_error"
     return "dispatch_next_task"
@@ -90,6 +89,8 @@ def _route_after_dispatch(state: OrchestratorState) -> str:
     Returns:
         'handle_error' or 'await_task_result'.
     """
+    if state.get("cancelled"):
+        return "finalize_run"
     if state.get("error"):
         return "handle_error"
     return "await_task_result"
@@ -97,7 +98,7 @@ def _route_after_dispatch(state: OrchestratorState) -> str:
 
 def _route_after_await(state: OrchestratorState) -> str:
     """
-    Route to handle_error if task failed, otherwise record_result.
+    Route to record_result after an agent returns a task result.
 
     Args:
         state: OrchestratorState after await_task_result executes.
@@ -105,8 +106,12 @@ def _route_after_await(state: OrchestratorState) -> str:
     Returns:
         'handle_error' or 'record_result'.
     """
+    if state.get("cancelled"):
+        return "finalize_run"
     task_result = state.get("task_result")
-    if task_result and task_result.get("error"):
+    if task_result:
+        return "record_result"
+    if state.get("error"):
         return "handle_error"
     return "record_result"
 
@@ -121,6 +126,8 @@ def _route_after_record(state: OrchestratorState) -> str:
     Returns:
         'dispatch_next_task' or 'synthesize_output'.
     """
+    if state.get("cancelled"):
+        return "finalize_run"
     completed = len(state.get("completed_tasks", []))
     total = len(state.get("task_plan", []))
     if completed < total:
@@ -141,6 +148,8 @@ def _route_after_error(state: OrchestratorState) -> str:
     Returns:
         'dispatch_next_task' or 'finalize_run'.
     """
+    if state.get("cancelled"):
+        return "finalize_run"
     if state.get("retry_count", 0) < settings.max_plan_retries:
         return "dispatch_next_task"
     return "finalize_run"
@@ -186,6 +195,7 @@ def build_graph() -> object:
         {
             "dispatch_next_task": "dispatch_next_task",
             "handle_error": "handle_error",
+            "finalize_run": "finalize_run",
         },
     )
     graph.add_conditional_edges(
@@ -194,6 +204,7 @@ def build_graph() -> object:
         {
             "handle_error": "handle_error",
             "await_task_result": "await_task_result",
+            "finalize_run": "finalize_run",
         },
     )
     graph.add_conditional_edges(
@@ -202,6 +213,7 @@ def build_graph() -> object:
         {
             "handle_error": "handle_error",
             "record_result": "record_result",
+            "finalize_run": "finalize_run",
         },
     )
     graph.add_conditional_edges(
@@ -210,6 +222,7 @@ def build_graph() -> object:
         {
             "dispatch_next_task": "dispatch_next_task",
             "synthesize_output": "synthesize_output",
+            "finalize_run": "finalize_run",
         },
     )
     graph.add_conditional_edges(

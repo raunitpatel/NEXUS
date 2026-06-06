@@ -16,6 +16,8 @@ volumes:
     driver: local
   zookeeper_log:
     driver: local
+  prometheus_data:
+    driver: local
 
 # ── Shared network ───────────────────────────────────────────────────────────
 networks:
@@ -167,6 +169,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
     ports:
       - "9090:9090"
     networks:

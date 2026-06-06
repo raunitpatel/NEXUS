@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 AgentType = Literal[
     "search",
@@ -113,6 +113,7 @@ class OrchestratorState(TypedDict):
     final_output: str | None
 
     status: RunStatus
+    cancelled: NotRequired[bool]
     error: str | None
     retry_count: int
 

@@ -28,6 +28,13 @@ from pydantic import BaseModel, Field
 AgentType = Literal[
     "search",
     "code",
+    "memory",
+    "tool",
+]
+
+TaskType = Literal[
+    "search",
+    "code",
     "memory_read",
     "memory_write",
     "tool",
@@ -53,10 +60,9 @@ EventType = Literal[
     "run_start",
     "run_complete",
     "run_error",
+    "run_cancelled",
     "memory_read",
     "memory_write",
-    "llm_response",
-    "code_iteration",
 ]
 
 
@@ -91,7 +97,7 @@ class TaskDispatchedMessage(BaseModel):
     task_id: str
     user_id: str
     agent_type: AgentType
-    task_type: AgentType  # matches tasks.type CHECK constraint in db/schema.sql
+    task_type: TaskType 
     input: dict[str, Any] = Field(default_factory=dict)
     attempt: int = 1
     timeout_seconds: int = 30

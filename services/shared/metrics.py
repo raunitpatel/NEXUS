@@ -29,24 +29,24 @@ All metric names follow the Prometheus convention:
 
 from prometheus_client import Counter, Gauge, Histogram
 
-# LLM / Anthropic API metrics
+# LLM / LLM API metrics
 
 llm_tokens_total = Counter(
     name="nexus_llm_tokens_total",
-    documentation="Total tokens consumed across all Anthropic API calls.",
+    documentation="Total tokens consumed across all  API calls.",
     labelnames=["service", "model", "type"],  # type is "input" or "output"
 )
 
 llm_request_duration_seconds = Histogram(
     name="nexus_llm_request_duration_seconds",
-    documentation="End-to-end latency of Anthropic API calls in seconds.",
+    documentation="End-to-end latency of LLM API calls in seconds.",
     labelnames=["service", "model"],
     buckets=(0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0),
 )
 
 llm_requests_total = Counter(
     name="nexus_llm_requests_total",
-    documentation="Total number of Anthropic API calls.",
+    documentation="Total number of LLM API calls.",
     labelnames=["service", "model", "status"],  # status is "success" or "error" or "cached"
 )
 
@@ -54,8 +54,8 @@ llm_requests_total = Counter(
 
 agent_task_duration_seconds = Histogram(
     name="nexus_agent_task_duration_seconds",
-    documentation="Time taken for an agent to complete a dispathed task.",
-    labelnames=["agent", "status"],  # agent: "search"|"code"|"memory"|"tool""
+    documentation="Time taken for an agent to complete a dispatched task.",
+    labelnames=["agent", "status"],  # agent: "search"|"code"|"tool"|"memory_read"|"memory_write"
     buckets=(0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0, 60.0),
 )
 

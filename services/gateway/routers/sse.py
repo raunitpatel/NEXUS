@@ -38,7 +38,7 @@ router = APIRouter()
 
 # SSE events that signal the run has reached a terminal state.
 # The proxy closes the stream within one iteration of receiving these.
-_TERMINAL_EVENT_TYPES: frozenset[str] = frozenset({"run_complete", "run_error"})
+_TERMINAL_EVENT_TYPES: frozenset[str] = frozenset({"run_complete", "run_error", "run_cancelled"})
 
 
 async def _validate_token(token: str, redis_client: aioredis.Redis) -> str:
@@ -152,7 +152,7 @@ async def _proxy_stream(run_id: str) -> AsyncIterator[bytes]:
     """
     Open an httpx SSE connection to the Orchestrator and yield each chunk.
 
-    Monitors event payloads for terminal event types (run_complete, run_error)
+    Monitors event payloads for terminal event types (run_complete, run_error, run_cancelled)
     and stops iteration after forwarding the terminal event, allowing the
     StreamingResponse to close the connection within one poll cycle.
 
@@ -201,12 +201,12 @@ async def _proxy_stream(run_id: str) -> AsyncIterator[bytes]:
 
     except httpx.ConnectError as exc:
         logger.error("sse.orchestrator_unreachable", run_id=run_id, error=str(exc))
-        error_event = 'data: {"event_type":"error","payload":{"message":"Orchestrator stream unavailable"}}\n\n'
+        error_event = 'event: error\ndata: {"event_type":"error","payload":{"message":"Orchestrator stream unavailable"}}\n\n'
         yield error_event.encode("utf-8")
 
     except httpx.HTTPStatusError as exc:
         logger.error("sse.orchestrator_http_error", run_id=run_id, status=exc.response.status_code)
-        error_event = f'data: {{"event_type":"error","payload":{{"message":"Upstream error {exc.response.status_code}"}}}}\n\n'
+        error_event = f'event: error\ndata: {{"event_type":"error","payload":{{"message":"Upstream error {exc.response.status_code}"}}}}\n\n'
         yield error_event.encode("utf-8")
 
 

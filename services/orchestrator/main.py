@@ -14,14 +14,15 @@ from contextlib import asynccontextmanager
 import redis.asyncio as aioredis
 import structlog
 from config import settings
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from graph import build_graph
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 from shared.logging import configure_logging
 from shared.metrics import active_runs, configure_metrics, orchestrator_runs_total
 from shared.telemetry import configure_telemetry
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from state import OrchestratorState
 
 logger = structlog.get_logger(__name__)
@@ -155,7 +156,7 @@ def create_app() -> FastAPI:
 
         Returns {run_id, status: "running"} immediately. The graph executes
         in the background via asyncio.ensure_future and updates the runs row
-        in Postgres when complete (implemented in AGNT-010).
+        in Postgres when complete.
 
         Args:
             body: OrchestrateRequest with run_id, query, user_id.
@@ -163,6 +164,8 @@ def create_app() -> FastAPI:
         Returns:
             OrchestrateResponse confirming the run has been dispatched.
         """
+        await _ensure_run_accepted(app.state.db_engine, body.run_id)
+
         initial_state: OrchestratorState = {
             "run_id": body.run_id,
             "user_id": body.user_id,
@@ -190,6 +193,54 @@ def create_app() -> FastAPI:
         return OrchestrateResponse(run_id=body.run_id, status="running")
 
     return app
+
+
+async def _ensure_run_accepted(engine: AsyncEngine, run_id: str) -> None:
+    session_factory = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    async with session_factory() as session:
+        result = await session.execute(
+            text(
+                """
+                UPDATE runs
+                SET status = 'running'
+                WHERE id = :run_id
+                  AND status = 'pending'
+                RETURNING status
+                """
+            ),
+            {"run_id": run_id},
+        )
+        row = result.fetchone()
+        if row is not None:
+            await session.commit()
+            return
+
+        result = await session.execute(
+            text("SELECT status FROM runs WHERE id = :run_id"),
+            {"run_id": run_id},
+        )
+        row = result.fetchone()
+
+        if row is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Run {run_id} not found",
+            )
+
+        current_status = row.status
+        if current_status == 'cancelled':
+            raise HTTPException(
+                status_code=409,
+                detail=f"Run {run_id} is cancelled",
+            )
+
+        if current_status == 'running':
+            return
+
+        raise HTTPException(
+            status_code=409,
+            detail=f"Run {run_id} cannot be orchestrated because it is already {current_status}",
+        )
 
 
 async def _run_graph(

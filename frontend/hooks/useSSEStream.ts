@@ -8,7 +8,7 @@
  *
  * Automatically closes the connection when:
  *   - The component unmounts (useEffect cleanup)
- *   - A terminal event (run_complete, run_error) is received
+ *   - A terminal event (run_complete, run_error, run_cancelled) is received
  *
  * @param runId - UUID of the run to stream events for.
  * @param enabled - Set to false to skip connection (e.g. run already completed).
@@ -28,7 +28,7 @@ export interface UseSSEStreamResult {
   retry: () => void
 }
 
-const TERMINAL_EVENT_TYPES = new Set(['run_complete', 'run_error'])
+const TERMINAL_EVENT_TYPES = new Set(['run_complete', 'run_error', 'run_cancelled'])
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 const SSE_EVENT_TYPES = [
   'thought',
@@ -42,6 +42,7 @@ const SSE_EVENT_TYPES = [
   'run_start',
   'run_complete',
   'run_error',
+  'run_cancelled',
   'memory_read',
   'memory_write',
   'llm_response',

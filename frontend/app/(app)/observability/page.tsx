@@ -18,6 +18,7 @@ import { useMetricsSummary } from '@/hooks/useMetrics'
 import { useAgentStats } from '@/hooks/useAgentStats'
 import { useTokenUsage } from '@/hooks/useTokenUsage'
 import { useLatency } from '@/hooks/useLatency'
+import { useErrorRate } from '@/hooks/useErrorRate'
 import { TokenUsageChart } from './TokenUsageChart'
 import { LatencyChart } from './LatencyChart'
 import { ErrorRateChart } from './ErrorRateChart'
@@ -61,6 +62,7 @@ export default function ObservabilityPage() {
   const { stats, isLoading: statsLoading } = useAgentStats({ days: DAYS })
   const { data: tokenData, isLoading: tokenLoading } = useTokenUsage(DAYS)
   const { data: latencyData, isLoading: latencyLoading } = useLatency(DAYS)
+  const { data: errorData, isLoading: errorLoading } = useErrorRate(DAYS)
 
   const successPct = summary ? `${(summary.success_rate * 100).toFixed(0)}%` : '—'
   const avgLatency = summary ? `${(summary.avg_run_duration_ms / 1000).toFixed(1)}s` : '—'
@@ -108,11 +110,7 @@ export default function ObservabilityPage() {
 
         <div className="mb-5">
           <SectionCard title="Error rate" subtitle="% of failed runs per day">
-            <ErrorRateChart
-              tokenData={tokenData}
-              summary={summary}
-              isLoading={tokenLoading || summaryLoading}
-            />
+            <ErrorRateChart data={errorData} isLoading={errorLoading} />
           </SectionCard>
         </div>
 

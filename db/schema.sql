@@ -103,7 +103,8 @@ CREATE TABLE IF NOT EXISTS events (
     CONSTRAINT events_type_values CHECK (type IN (
         'thought', 'tool_call', 'tool_result', 'agent_start', 'agent_end',
         'orchestrator_plan', 'orchestrator_dispatch', 'orchestrator_synthesize',
-        'run_start', 'run_complete', 'run_error', 'memory_read', 'memory_write'
+        'run_start', 'run_complete', 'run_error', 'run_cancelled',
+        'memory_read', 'memory_write'
     )),
     CONSTRAINT events_source_not_empty CHECK (char_length(trim(source)) > 0)
 );

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TopBar } from '@/components/ui/TopBar'
 import { SearchBar } from './SearchBar'
 import { MemoryResultCard } from './MemoryResultCard'
@@ -56,6 +56,7 @@ function EmptyState({ hasQuery }: { hasQuery: boolean }) {
 
 export default function MemoryPage() {
   const [query, setQuery] = useState('')
+  const [similarityThreshold, setSimilarityThreshold] = useState(0.35)
 
   const hasQuery = query.trim().length > 0
 
@@ -69,19 +70,27 @@ export default function MemoryPage() {
     data: searchData,
     isLoading: searchLoading,
     isError: searchError,
-  } = useMemorySearch(query)
+    mutate: mutateSearch,
+  } = useMemorySearch(query, { similarityThreshold })
+
+  useEffect(() => {
+    if (!hasQuery) {
+      return
+    }
+
+    void mutateSearch()
+  }, [hasQuery, similarityThreshold, mutateSearch])
 
   const searchResults = searchData?.results ?? []
 
-  const results =
-  hasQuery && searchResults.length > 0
+  const results = hasQuery
     ? searchResults.map((item: any) => ({
         ...item,
-        similarity: item.similarity ?? 1,
+        similarity: item.similarity ?? 0,
       }))
     : memoryData.map((item: any) => ({
         ...item,
-        similarity: 1,
+        similarity: undefined,
       }))
 
   const isLoading = hasQuery
@@ -109,14 +118,16 @@ export default function MemoryPage() {
       <TopBar title="My memory" />
 
       <div className="flex-1 bg-nexus-bg overflow-y-auto p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
+          <div className="max-w-[760px]">
             <h2 className="text-[16px] font-semibold text-nexus-dark">
               Your agent memory
             </h2>
 
             <p className="text-[12.5px] text-nexus-muted mt-[2px]">
               Search across outputs from your past runs — powered by pgvector semantic similarity.
+              Use the threshold control to hide loosely related matches and surface the most relevant
+              memory entries.
             </p>
           </div>
 
@@ -131,6 +142,33 @@ export default function MemoryPage() {
           onDebouncedChange={setQuery}
           suggestions={SUGGESTIONS}
         />
+
+        <div className="bg-white rounded-[8px] border border-black/[0.08] px-[18px] py-4 mb-5">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <label htmlFor="similarity-threshold" className="text-[12px] font-semibold text-nexus-dark">
+                Minimum relevance threshold
+              </label>
+              <p className="text-[12px] text-nexus-muted mt-[2px] max-w-[640px]">
+                Increase this value to show only stronger semantic matches for your query.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] text-nexus-muted">{Math.round(similarityThreshold * 100)}%</span>
+              <input
+                id="similarity-threshold"
+                type="range"
+                min={0.35}
+                max={1}
+                step={0.05}
+                value={similarityThreshold}
+                onChange={(event) => setSimilarityThreshold(Number(event.target.value))}
+                className="h-2 w-full max-w-[240px] accent-nexus-accent"
+              />
+            </div>
+          </div>
+        </div>
 
         {isError && (
           <div className="bg-[#FDECEA] border border-nexus-error/20 rounded-[7px] px-4 py-3 flex items-center gap-2 text-[13px] text-nexus-error mb-4">

@@ -11,8 +11,9 @@
  * Design reference: Page 3 and 3b in docs/design/nexus-all-pages.html.
  */
 
-import { useEffect, useMemo, useRef } from 'react'
-import type { Run, RunEvent } from '@/lib/types'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CancelRunResponse, Run, RunEvent } from '@/lib/types'
+import { apiFetch } from '@/lib/api'
 import { useSSEStream } from '@/hooks/useSSEStream'
 import { EventCard } from './EventCard'
 import { RunSummary } from './RunSummary'
@@ -47,6 +48,9 @@ function FinalAnswer({ output }: { output: string }) {
 export function ThoughtTrace({ run, initialEvents }: ThoughtTraceProps) {
   const isLive = run.status === 'running'
   const bottomRef = useRef<HTMLDivElement>(null)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelMessage, setCancelMessage] = useState<string | null>(null)
+  const [cancelRequested, setCancelRequested] = useState(false)
 
   const { events: liveEvents, status, finalOutput, error, retry } = useSSEStream(
     run.run_id,
@@ -71,10 +75,61 @@ export function ThoughtTrace({ run, initialEvents }: ThoughtTraceProps) {
     return typeof llmContent === 'string' && llmContent.trim() ? llmContent : null
   }, [displayEvents])
 
+  const terminalEventType = useMemo(
+    () =>
+      [...displayEvents]
+        .reverse()
+        .find((event) =>
+          event.event_type === 'run_complete' ||
+          event.event_type === 'run_error' ||
+          event.event_type === 'run_cancelled'
+        )?.event_type,
+    [displayEvents]
+  )
+
+  const derivedRunStatus =
+    run.status !== 'running'
+      ? run.status
+      : terminalEventType === 'run_complete'
+      ? 'completed'
+      : terminalEventType === 'run_error'
+      ? 'failed'
+      : terminalEventType === 'run_cancelled'
+      ? 'cancelled'
+      : run.status
+
   // Auto-scroll to bottom as new events arrive
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [displayEvents.length])
+
+  const canCancel =
+    (run.status === 'running' || run.status === 'pending') &&
+    status !== 'closed' &&
+    !cancelRequested
+
+  async function handleCancelRun() {
+    if (!canCancel || isCancelling) return
+
+    setCancelMessage(null)
+    setIsCancelling(true)
+
+    try {
+      await apiFetch<CancelRunResponse>(`/api/v1/runs/${encodeURIComponent(run.run_id)}/cancel`, {
+        method: 'POST',
+      })
+      setCancelRequested(true)
+      setCancelMessage('Run cancellation requested successfully.')
+    } catch (err) {
+      const message =
+        err && typeof err === 'object' && 'detail' in err
+          ? (err as { detail?: string }).detail ?? 'Unable to cancel run.'
+          : 'Unable to cancel run.'
+      setCancelMessage(message)
+    } finally {
+      setIsCancelling(false)
+    }
+  }
 
   return (
     <div className="grid grid-cols-[1fr_288px] gap-4 items-start">
@@ -108,6 +163,27 @@ export function ThoughtTrace({ run, initialEvents }: ThoughtTraceProps) {
             )}
           </div>
 
+          {canCancel && (
+            <div className="px-4 py-3 border-b border-black/[0.06] bg-[#FFFBF0] flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[12px] text-[#7F6D22]">
+                  This run is still active. Cancel to stop further execution.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCancelRun}
+                  disabled={isCancelling}
+                  className="inline-flex items-center justify-center rounded-[6px] border border-[#B38A1F] bg-[#FFF6D8] px-3 py-2 text-[12.5px] font-semibold text-[#7F6D22] transition-colors hover:bg-[#F8E8A0] disabled:opacity-50"
+                >
+                  {isCancelling ? 'Cancelling…' : 'Cancel run'}
+                </button>
+              </div>
+              {cancelMessage && (
+                <div className="text-[12px] text-[#7F6D22]">{cancelMessage}</div>
+              )}
+            </div>
+          )}
+
           {displayEvents.length === 0 ? (
             <div className="px-4 py-8 text-center text-[13px] text-nexus-muted">
               {isLive ? 'Waiting for first event…' : 'No events recorded for this run.'}
@@ -125,7 +201,7 @@ export function ThoughtTrace({ run, initialEvents }: ThoughtTraceProps) {
 
       {/* Right: summary panel */}
       <RunSummary
-        run={run}
+        run={{ ...run, status: derivedRunStatus }}
         events={displayEvents}
         connectionStatus={isLive ? status : 'closed'}
       />

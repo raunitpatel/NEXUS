@@ -25,13 +25,6 @@ function getSimilarityColor(score: number): string {
   return '#888780'
 }
 
-// Similarity label derived from numeric score
-function getSimilarityLabel(score: number): string {
-  if (score >= 0.9) return 'Highly relevant'
-  if (score >= 0.75) return 'Relevant'
-  return 'Loosely related'
-}
-
 const MEMORY_CHIP = {
   bg: '#E6F1FB',
   text: '#0C447C',
@@ -45,9 +38,7 @@ const MEMORY_CHIP = {
 export function MemoryResultCard({
   result,
 }: MemoryResultCardProps) {
-  const similarityPct = Math.round(result.similarity * 100)
-
-  const similarityColor = getSimilarityColor(result.similarity)
+  const similarityColor = result.similarity !== undefined ? getSimilarityColor(result.similarity) : '#F1EFE8'
 
   const preview =
     result.content.length > 200
@@ -68,29 +59,31 @@ export function MemoryResultCard({
       "
     >
       {/* Similarity score badge */}
-      <span
-        className="
-          absolute
-          top-[14px]
-          right-[14px]
-          px-[8px]
-          py-[2px]
-          rounded-[4px]
-          text-[11.5px]
-          font-bold
-        "
-        style={{
-          background:
-            similarityColor === '#1D9E75'
-              ? '#D4F3E6'
-              : similarityColor === '#BA7517'
-                ? '#FEF3E2'
-                : '#F1EFE8',
-          color: similarityColor,
-        }}
-      >
-        {result.similarity.toFixed(2)}
-      </span>
+      {result.similarity !== undefined && (
+        <span
+          className="
+            absolute
+            top-[14px]
+            right-[14px]
+            px-[8px]
+            py-[2px]
+            rounded-[4px]
+            text-[11.5px]
+            font-bold
+          "
+          style={{
+            background:
+              similarityColor === '#1D9E75'
+                ? '#D4F3E6'
+                : similarityColor === '#BA7517'
+                  ? '#FEF3E2'
+                  : '#F1EFE8',
+            color: similarityColor,
+          }}
+        >
+          {result.similarity.toFixed(2)}
+        </span>
+      )}
 
       {/* Agent chip + run id */}
       <div className="flex items-center gap-2 mb-[10px]">

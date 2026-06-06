@@ -11,7 +11,7 @@ This endpoint is consumed by:
 The response is a text/event-stream with:
   - One SSE event per orchestrator node state change
   - A heartbeat comment (': heartbeat') every 15 seconds
-  - Stream closes after run_complete or run_error event
+  - Stream closes after run_complete, run_error, or run_cancelled event
 """
 
 import structlog

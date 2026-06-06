@@ -13,7 +13,7 @@ Two public functions:
     sse_stream_generator()   — async generator that subscribes to sse:{run_id},
                                yields SSE-formatted strings, sends a heartbeat every
                                15 seconds on idle, and closes cleanly on terminal
-                               events (run_complete / run_error) or client disconnect.
+                               events (run_complete / run_error / run_cancelled) or client disconnect.
 
 Redis key schema:
     sse:{run_id}             — pub/sub channel (ephemeral)
@@ -40,7 +40,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 
 logger = structlog.get_logger(__name__)
 
-_TERMINAL_EVENTS: frozenset[str] = frozenset({"run_complete", "run_error"})
+_TERMINAL_EVENTS: frozenset[str] = frozenset({"run_complete", "run_error", "run_cancelled"})
 _EVENT_LIST_TTL_SECONDS: int = 60
 _DONE_SENTINEL_TTL_SECONDS: int = 60
 _HEARTBEAT_INTERVAL_SECONDS: float = 15.0
@@ -58,7 +58,7 @@ async def emit_event(
 
     Serializes the event to JSON, publishes to the pub/sub channel
     sse:{run_id}, and appends to the replay LIST sse:events:{run_id}.
-    If event_type is a terminal type (run_complete, run_error), also sets
+    If event_type is a terminal type (run_complete, run_error, run_cancelled), also sets
     the sse:done:{run_id} sentinel key so late-joining clients can detect
     the run has already finished.
 

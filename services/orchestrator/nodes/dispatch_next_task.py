@@ -19,6 +19,7 @@ import structlog
 from sse_emitter import emit_event
 from state import OrchestratorState, TaskPlan
 
+import nodes.cancel as cancel
 from nodes import get_redis_client
 from nodes.task_persistence import task_exists
 
@@ -142,6 +143,10 @@ async def dispatch_next_task(state: OrchestratorState) -> dict[str, Any]:
     from config import settings
 
     run_id = state["run_id"]
+    cancel_state = await cancel.maybe_cancel_run(run_id)
+    if cancel_state:
+        return cancel_state
+
     task_plan = state.get("task_plan", [])
     completed_tasks = state.get("completed_tasks", [])
     attempt = state.get("retry_count", 0) + 1

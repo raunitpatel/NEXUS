@@ -44,6 +44,7 @@ const EVENT_BADGE: Record<string, BadgeConfig> = {
   run_start:                { label: 'Run start',    bg: '#E8F8F2', text: '#1D9E75', borderColor: '#1D9E75' },
   run_complete:             { label: 'Complete',     bg: '#D4F3E6', text: '#0A5E3A', borderColor: '#1D9E75' },
   run_error:                { label: 'Error',        bg: '#FDECEA', text: '#E24B4A', borderColor: '#E24B4A' },
+  run_cancelled:             { label: 'Cancelled',    bg: '#F1EFE8', text: '#888780', borderColor: '#888780' },
   memory_read:              { label: 'Memory read',  bg: '#EEEDFE', text: '#3C3489', borderColor: '#7F77DD' },
   memory_write:             { label: 'Memory write', bg: '#EEEDFE', text: '#3C3489', borderColor: '#7F77DD' },
   llm_response:             { label: 'LLM',          bg: '#D4F3E6', text: '#0A5E3A', borderColor: '#1D9E75' },
@@ -63,11 +64,14 @@ const DEFAULT_BADGE: BadgeConfig = {
 
 function formatTime(isoString: string): string {
   try {
-    return new Date(isoString).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
+    return new Date(isoString)
+      .toLocaleTimeString('en-US', {
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })
+      .toLowerCase()
   } catch {
     return isoString
   }
@@ -121,10 +125,21 @@ function extractContent(data: unknown): string | null {
       }
     }
 
-    // recursive extraction
+    // prefer nested objects/arrays before scalar values
     for (const value of Object.values(obj)) {
-      const result = extractContent(value)
-      if (result) return result
+      if (typeof value === 'object' && value !== null) {
+        const result = extractContent(value)
+        if (result) return result
+      }
+    }
+
+    // fallback scalar strings, ignoring IDs and metadata
+    const ignoredKeys = new Set(['id', 'run_id', 'task_id', 'model', 'metadata'])
+    for (const [key, value] of Object.entries(obj)) {
+      if (ignoredKeys.has(key)) continue
+      if (typeof value === 'string' && value.trim()) {
+        return value
+      }
     }
   }
 
@@ -155,9 +170,6 @@ export function EventCard({ event, index }: EventCardProps) {
   const toolName =
     (payload.agent_type as string | undefined) ??
     (payload.tool as string | undefined)
-
-  // Temporary debugging
-  console.log('EVENT PAYLOAD', event)
 
   return (
     <div

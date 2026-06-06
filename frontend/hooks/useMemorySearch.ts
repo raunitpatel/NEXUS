@@ -13,6 +13,7 @@ import type { MemorySearchResponse } from '@/lib/types'
 
 interface UseMemorySearchOptions {
   limit?: number
+  similarityThreshold?: number
 }
 
 interface UseMemorySearchResult {
@@ -36,11 +37,14 @@ export function useMemorySearch(
   query: string,
   options: UseMemorySearchOptions = {}
 ): UseMemorySearchResult {
-  const { limit = 10 } = options
+  const {
+    limit = 10,
+    similarityThreshold = 0.35,
+  } = options
 
   const url =
     query.trim().length > 0
-      ? `/api/v1/memory/search?q=${encodeURIComponent(query.trim())}&limit=${limit}`
+      ? `/api/v1/memory/search?q=${encodeURIComponent(query.trim())}&limit=${limit}&similarity_threshold=${similarityThreshold}`
       : null
 
   const { data, error, isLoading, mutate } = useSWR<MemorySearchResponse>(

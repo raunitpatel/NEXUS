@@ -95,6 +95,17 @@ def _extract_summary(response_data: Any) -> str | None:
 
     # Dicts
     if isinstance(response_data, dict):
+        if "results" in response_data and isinstance(response_data["results"], list):
+            results = response_data["results"]
+            if results:
+                summary = _extract_summary(results)
+                if summary:
+                    return summary
+                return f"{len(results)} memory result(s)"
+
+        if "embedding_id" in response_data:
+            return "Stored memory entry"
+
         priority_keys = [
             "summary",
             "content",
@@ -103,6 +114,9 @@ def _extract_summary(response_data: Any) -> str | None:
             "response",
             "message",
             "text",
+            "snippet",
+            "output_preview",
+            "final_answer",
             "stdout",
             "stderr",
         ]
@@ -112,11 +126,19 @@ def _extract_summary(response_data: Any) -> str | None:
             if isinstance(value, str) and value.strip():
                 return value
 
-        # recurse nested values
+        # Recurse nested values, preferring nested objects/arrays first
         for value in response_data.values():
-            result = _extract_summary(value)
-            if result:
-                return result
+            if isinstance(value, (dict, list)):
+                result = _extract_summary(value)
+                if result:
+                    return result
+
+        # Fallback to scalar strings only if no nested extract was found
+        for key, value in response_data.items():
+            if key in {"id", "run_id", "task_id", "model"}:
+                continue
+            if isinstance(value, str) and value.strip():
+                return value
 
     return None
 

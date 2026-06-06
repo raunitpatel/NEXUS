@@ -10,6 +10,7 @@ Endpoints:
   GET "/agent-stats"    — per-agent breakdown of runs, latency, success rate
   GET "/token-usage"    — daily token usage for the past N days (for charts)
   GET "/latency"        — per-agent average latency for the past N days
+  GET "/error-rate"     — daily run error rate for the past N days
 """
 
 from __future__ import annotations
@@ -110,6 +111,23 @@ class DailyLatency(BaseModel):
     avg_duration_ms: float
     p95_duration_ms: float
     run_count: int
+
+
+class DailyErrorRate(BaseModel):
+    """
+    Run failure rate for a single day.
+
+    Attributes:
+        date: ISO date string (YYYY-MM-DD).
+        total_runs: Number of terminal runs on this date.
+        failed_runs: Number of failed runs on this date.
+        error_rate: failed_runs / total_runs as 0.0-1.0.
+    """
+
+    date: str
+    total_runs: int
+    failed_runs: int
+    error_rate: float
 
 
 # ── GET /api/v1/metrics/summary ───────────────────────────────────────────────
@@ -216,7 +234,7 @@ async def get_agent_stats(
 
     Joins tasks → runs to enforce user ownership — only tasks from the
     authenticated user's runs are included. Uses the tasks table type column
-    which maps directly to agent type (search/code/memory_read/memory_write/tool).
+    which maps directly to task type (search/code/memory_read/memory_write/tool).
 
     Args:
         current_user: Injected by get_current_user.
@@ -231,23 +249,34 @@ async def get_agent_stats(
     result = await db.execute(
         text(
             """
-            SELECT
-                t.type                                                      AS agent_type,
-                COUNT(*)                                                    AS total_tasks,
-                COUNT(*) FILTER (WHERE t.status = 'completed')             AS successful_tasks,
-                COUNT(*) FILTER (WHERE t.status = 'failed')                AS failed_tasks,
-                COALESCE(
-                    AVG(
-                        EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) * 1000
-                    ) FILTER (WHERE t.completed_at IS NOT NULL),
-                    0
-                )                                                           AS avg_duration_ms
-            FROM tasks t
-            JOIN runs r ON r.id = t.run_id
-            WHERE r.user_id = :user_id
-              AND t.created_at >= NOW() - INTERVAL '1 day' * :days
-            GROUP BY t.type
-            ORDER BY total_tasks DESC
+                SELECT
+                    t.type                                                      AS agent_type,
+                    COUNT(*)                                                    AS total_tasks,
+                    COUNT(*) FILTER (
+                        WHERE t.status = 'completed'
+                          AND (t.error IS NULL OR t.error = '')
+                    )                                                           AS successful_tasks,
+                    COUNT(*) FILTER (
+                        WHERE t.status = 'failed'
+                           OR (t.error IS NOT NULL AND t.error <> '')
+                           OR (
+                               r.status IN ('failed', 'cancelled')
+                               AND t.status IN ('pending', 'running', 'retrying')
+                           )
+                    )                                                           AS failed_tasks,
+                    COALESCE(
+                        AVG(
+                            EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) * 1000
+                        ) FILTER (WHERE t.completed_at IS NOT NULL),
+                        0
+                    )                                                           AS avg_duration_ms
+                FROM tasks t
+                JOIN runs r
+                    ON r.id = t.run_id
+                WHERE r.user_id = :user_id
+                AND t.created_at >= NOW() - INTERVAL '1 day' * :days
+                GROUP BY t.type
+                ORDER BY total_tasks DESC;
             """
         ),
         {"user_id": user_id, "days": days},
@@ -267,6 +296,63 @@ async def get_agent_stats(
                 4,
             ),
             avg_duration_ms=round(float(row.avg_duration_ms or 0), 1),
+        )
+        for row in rows
+    ]
+
+
+# ── GET /api/v1/metrics/error-rate ────────────────────────────────────────────
+
+
+@router.get(
+    "/error-rate",
+    response_model=list[DailyErrorRate],
+    summary="Daily run error rate for the authenticated user",
+)
+async def get_error_rate(
+    current_user: Annotated[dict[str, str], Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db_session)],
+    days: int = Query(default=7, ge=1, le=90),
+) -> list[DailyErrorRate]:
+    """
+    Return daily run failure rates for terminal runs in the lookback window.
+
+    This is separate from per-agent task failures: a run can complete with a
+    useful synthesized answer even if one task failed, while this endpoint shows
+    whether the overall run ended in a failed state.
+    """
+    user_id = current_user["user_id"]
+
+    result = await db.execute(
+        text(
+            """
+            SELECT
+                DATE(created_at AT TIME ZONE 'UTC')                AS date,
+                COUNT(*)                                           AS total_runs,
+                COUNT(*) FILTER (WHERE status = 'failed')          AS failed_runs
+            FROM runs
+            WHERE user_id = :user_id
+                AND status IN ('completed', 'failed', 'cancelled')
+                AND created_at >= NOW() - INTERVAL '1 day' * :days
+            GROUP BY DATE(created_at AT TIME ZONE 'UTC')
+            ORDER BY date ASC
+            """
+        ),
+        {"user_id": user_id, "days": days},
+    )
+    rows = result.fetchall()
+
+    logger.info("metrics.error_rate", user_id=user_id, days=days, row_count=len(rows))
+
+    return [
+        DailyErrorRate(
+            date=str(row.date),
+            total_runs=int(row.total_runs),
+            failed_runs=int(row.failed_runs),
+            error_rate=round(
+                row.failed_runs / row.total_runs if row.total_runs > 0 else 0.0,
+                4,
+            ),
         )
         for row in rows
     ]
@@ -313,8 +399,8 @@ async def get_token_usage(
                 COUNT(*)                                                     AS run_count
             FROM runs
             WHERE user_id = :user_id
-              AND status = 'completed'
-              AND created_at >= NOW() - INTERVAL '1 day' * :days
+                AND status = 'completed'
+                AND created_at >= NOW() - INTERVAL '1 day' * :days
             GROUP BY DATE(created_at AT TIME ZONE 'UTC')
             ORDER BY date ASC
             """
@@ -381,9 +467,9 @@ async def get_latency(
                 COUNT(*)                                                         AS run_count
             FROM runs
             WHERE user_id = :user_id
-              AND status = 'completed'
-              AND metadata ? 'duration_ms'
-              AND created_at >= NOW() - INTERVAL '1 day' * :days
+                AND status = 'completed'
+                AND metadata ? 'duration_ms'
+                AND created_at >= NOW() - INTERVAL '1 day' * :days
             GROUP BY DATE(created_at AT TIME ZONE 'UTC')
             ORDER BY date ASC
             """

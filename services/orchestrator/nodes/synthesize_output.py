@@ -19,6 +19,7 @@ from llm_provider import LLMProviderError, get_llm_provider
 from sse_emitter import emit_event
 from state import OrchestratorState, TaskResult
 
+import nodes.cancel as cancel
 from nodes import get_redis_client
 from nodes.decompose_query import OrchestratorError
 
@@ -63,6 +64,11 @@ async def synthesize_output(state: OrchestratorState) -> dict[str, Any]:
         OrchestratorError: If the LLM provider fails or returns empty output.
     """
     run_id = state["run_id"]
+    cancel_state = await cancel.maybe_cancel_run(run_id)
+    if cancel_state:
+        logger.info("synthesize_output.run_cancelled", run_id=run_id)
+        return cancel_state
+
     query = state["query"]
     # FIX C4: read "completed_tasks" not "task_results"
     completed_tasks: list[TaskResult] = state.get("completed_tasks", [])
