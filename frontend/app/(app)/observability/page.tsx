@@ -56,7 +56,7 @@ function MetricPill({ label, value }: { label: string; value: string }) {
 }
 
 export default function ObservabilityPage() {
-  const DAYS = 7
+  const DAYS = 365
 
   const { summary, isLoading: summaryLoading } = useMetricsSummary({ days: DAYS })
   const { stats, isLoading: statsLoading } = useAgentStats({ days: DAYS })

@@ -26,7 +26,7 @@ async function metricsSummaryFetcher(url: string): Promise<MetricsSummary> {
 export function useMetricsSummary(
   options: UseMetricsSummaryOptions = {}
 ): UseMetricsSummaryResult {
-  const { days = 7 } = options
+  const { days = 36500 } = options
   const url = `/api/v1/metrics/summary?days=${days}`
 
   const { data, error, isLoading, mutate } = useSWR<MetricsSummary>(

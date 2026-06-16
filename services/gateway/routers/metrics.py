@@ -141,7 +141,7 @@ class DailyErrorRate(BaseModel):
 async def get_summary(
     current_user: Annotated[dict[str, str], Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    days: int = Query(default=7, ge=1, le=90, description="Lookback window in days"),
+    days: int = Query(default=7, ge=1,  description="Lookback window in days"),
 ) -> MetricsSummary:
     """
     Return aggregated run statistics for the authenticated user.
@@ -227,7 +227,7 @@ async def get_summary(
 async def get_agent_stats(
     current_user: Annotated[dict[str, str], Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    days: int = Query(default=7, ge=1, le=90),
+    days: int = Query(default=7, ge=1),
 ) -> list[AgentStat]:
     """
     Return per-agent-type task counts, success rates, and average latency.
@@ -312,7 +312,7 @@ async def get_agent_stats(
 async def get_error_rate(
     current_user: Annotated[dict[str, str], Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    days: int = Query(default=7, ge=1, le=90),
+    days: int = Query(default=7, ge=1),
 ) -> list[DailyErrorRate]:
     """
     Return daily run failure rates for terminal runs in the lookback window.
@@ -369,7 +369,7 @@ async def get_error_rate(
 async def get_token_usage(
     current_user: Annotated[dict[str, str], Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    days: int = Query(default=7, ge=1, le=90),
+    days: int = Query(default=7, ge=1),
 ) -> list[DailyTokenUsage]:
     """
     Return daily token usage totals for the past N days.
@@ -433,7 +433,7 @@ async def get_token_usage(
 async def get_latency(
     current_user: Annotated[dict[str, str], Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db_session)],
-    days: int = Query(default=7, ge=1, le=90),
+    days: int = Query(default=7, ge=1),
 ) -> list[DailyLatency]:
     """
     Return daily average and p95 run latency for the past N days.

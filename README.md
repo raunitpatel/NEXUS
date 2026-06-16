@@ -21,7 +21,7 @@ NEXUS lets users submit a natural-language query and watch in real time as speci
 
 ## Live Demo
 
-[![NEXUS Demo](https://img.youtube.com/vi/BrcfatovUzE/maxresdefault.jpg)](https://youtu.be/BrcfatovUzE)
+[![NEXUS Demo](https://img.youtube.com/vi/XArBxTpN97c/maxresdefault.jpg)](https://youtu.be/XArBxTpN97c)
 
 ---
 
@@ -249,10 +249,8 @@ Runs: infrastructure integration tests, DB schema tests (pytest-asyncio), gatewa
 ![alt text](<Screenshots/Screenshot 2026-06-06 222156.png>)
 ![alt text](<Screenshots/Screenshot 2026-06-06 222201.png>)
 ![alt text](<Screenshots/Screenshot 2026-06-06 222222.png>)
-
-
-
-
+![alt text](<Screenshots/Screenshot 2026-06-16 110224.png>)
+![alt text](<Screenshots/Screenshot 2026-06-16 110232.png>)
 
 ---
 
